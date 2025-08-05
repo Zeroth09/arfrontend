@@ -5,14 +5,6 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['clsx', 'tailwind-merge'],
   },
-  // Ensure CSS is properly processed
-  webpack: (config) => {
-    config.module.rules.push({
-      test: /\.css$/,
-      use: ['style-loader', 'css-loader', 'postcss-loader'],
-    });
-    return config;
-  },
 };
 
 export default nextConfig;
