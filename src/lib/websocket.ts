@@ -1,5 +1,7 @@
+import { io, Socket } from 'socket.io-client'
+
 export interface GameMessage {
-  type: 'player_join' | 'player_leave' | 'position_update' | 'shoot' | 'hit' | 'elimination' | 'game_state'
+  type: 'player_join' | 'player_leave' | 'position_update' | 'shoot' | 'hit' | 'elimination' | 'game_state' | 'current_players'
   playerId: string
   data: Record<string, unknown>
   timestamp: number
@@ -19,7 +21,7 @@ export interface PlayerData {
 }
 
 export class MultiplayerWebSocket {
-  private ws: WebSocket | null = null
+  private socket: Socket | null = null
   private reconnectAttempts = 0
   private maxReconnectAttempts = 5
   private reconnectDelay = 1000
@@ -33,60 +35,132 @@ export class MultiplayerWebSocket {
 
   connect(): void {
     try {
-      this.ws = new WebSocket(`${this.serverUrl}/game?playerId=${this.playerId}`)
+      console.log('Connecting to Socket.io server:', this.serverUrl)
+      
+      this.socket = io(this.serverUrl, {
+        transports: ['websocket', 'polling'],
+        autoConnect: true,
+        reconnection: true,
+        reconnectionAttempts: this.maxReconnectAttempts,
+        reconnectionDelay: this.reconnectDelay
+      })
 
-      this.ws.onopen = () => {
-        console.log('WebSocket connected to multiplayer server')
+      this.socket.on('connect', () => {
+        console.log('Socket.io connected to multiplayer server')
         this.reconnectAttempts = 0
-        this.sendMessage({
-          type: 'player_join',
+        
+        // Send player join message
+        this.socket?.emit('player_join', {
           playerId: this.playerId,
-          data: { timestamp: Date.now() },
           timestamp: Date.now()
         })
-      }
+      })
 
-      this.ws.onmessage = (event) => {
-        try {
-          const message: GameMessage = JSON.parse(event.data)
-          console.log('Received message:', message)
-          this.onMessage(message)
-        } catch (error) {
-          console.error('Error parsing WebSocket message:', error)
-        }
-      }
+      this.socket.on('disconnect', () => {
+        console.log('Socket.io disconnected')
+      })
 
-      this.ws.onclose = () => {
-        console.log('WebSocket disconnected')
-        this.attemptReconnect()
-      }
+      this.socket.on('connect_error', (error) => {
+        console.error('Socket.io connection error:', error)
+      })
 
-      this.ws.onerror = (error) => {
-        console.error('WebSocket error:', error)
-      }
+      // Handle server status
+      this.socket.on('serverStatus', (data) => {
+        console.log('Server status:', data)
+      })
+
+      // Handle lobby events
+      this.socket.on('player_join', (data) => {
+        console.log('Player joined:', data)
+        this.onMessage({
+          type: 'player_join',
+          playerId: data.playerId || 'unknown',
+          data: data,
+          timestamp: Date.now()
+        })
+      })
+
+      this.socket.on('player_leave', (data) => {
+        console.log('Player left:', data)
+        this.onMessage({
+          type: 'player_leave',
+          playerId: data.playerId || 'unknown',
+          data: data,
+          timestamp: Date.now()
+        })
+      })
+
+      this.socket.on('game_state', (data) => {
+        console.log('Game state update:', data)
+        this.onMessage({
+          type: 'game_state',
+          playerId: 'server',
+          data: data,
+          timestamp: Date.now()
+        })
+      })
+
+      this.socket.on('current_players', (data) => {
+        console.log('Current players:', data)
+        this.onMessage({
+          type: 'current_players',
+          playerId: 'server',
+          data: data,
+          timestamp: Date.now()
+        })
+      })
+
+      // Handle game events
+      this.socket.on('position_update', (data) => {
+        this.onMessage({
+          type: 'position_update',
+          playerId: data.playerId || 'unknown',
+          data: data,
+          timestamp: Date.now()
+        })
+      })
+
+      this.socket.on('shoot', (data) => {
+        this.onMessage({
+          type: 'shoot',
+          playerId: data.playerId || 'unknown',
+          data: data,
+          timestamp: Date.now()
+        })
+      })
+
+      this.socket.on('hit', (data) => {
+        this.onMessage({
+          type: 'hit',
+          playerId: data.playerId || 'unknown',
+          data: data,
+          timestamp: Date.now()
+        })
+      })
+
+      this.socket.on('elimination', (data) => {
+        this.onMessage({
+          type: 'elimination',
+          playerId: data.playerId || 'unknown',
+          data: data,
+          timestamp: Date.now()
+        })
+      })
+
     } catch (error) {
-      console.error('Failed to connect WebSocket:', error)
-    }
-  }
-
-  private attemptReconnect(): void {
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
-      this.reconnectAttempts++
-      console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
-      
-      setTimeout(() => {
-        this.connect()
-      }, this.reconnectDelay * this.reconnectAttempts)
-    } else {
-      console.error('Max reconnection attempts reached')
+      console.error('Failed to connect Socket.io:', error)
     }
   }
 
   sendMessage(message: GameMessage): void {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(message))
+    if (this.socket && this.socket.connected) {
+      this.socket.emit(message.type, {
+        playerId: message.playerId,
+        data: message.data,
+        timestamp: message.timestamp
+      })
     } else {
-      console.warn('WebSocket not connected, message not sent:', message)
+      console.warn('Socket not connected, message not sent:', message)
     }
   }
 
@@ -131,15 +205,13 @@ export class MultiplayerWebSocket {
   }
 
   disconnect(): void {
-    if (this.ws) {
-      this.sendMessage({
-        type: 'player_leave',
+    if (this.socket) {
+      this.socket.emit('player_leave', {
         playerId: this.playerId,
-        data: { timestamp: Date.now() },
         timestamp: Date.now()
       })
-      this.ws.close()
-      this.ws = null
+      this.socket.disconnect()
+      this.socket = null
     }
   }
 
@@ -151,5 +223,14 @@ export class MultiplayerWebSocket {
   // Remove message handler
   off(event: string): void {
     this.messageHandlers.delete(event)
+  }
+
+  // Public method to emit events directly
+  emit(event: string, data: any): void {
+    if (this.socket && this.socket.connected) {
+      this.socket.emit(event, data)
+    } else {
+      console.warn('Socket not connected, event not sent:', event, data)
+    }
   }
 } 

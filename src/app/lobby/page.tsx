@@ -21,9 +21,9 @@ interface GameState {
 interface LobbyMessage extends GameMessage {
   data: {
     player?: Player
-    timestamp?: number
-    status?: string
+    status?: 'waiting' | 'starting' | 'playing' | 'finished'
     timeLeft?: number
+    players?: Player[]
   }
 }
 
@@ -56,7 +56,7 @@ export default function LobbyPage() {
         currentPlayerRef.current = currentPlayer
         
         // Initialize WebSocket connection
-        const serverUrl = 'https://shaky-meeting-production.up.railway.app'
+        const serverUrl = 'https://backendairsoftar-production.up.railway.app'
         const ws = new MultiplayerWebSocket(serverUrl, currentPlayer.id, (message) => {
           console.log('Received lobby message:', message)
           
@@ -70,6 +70,9 @@ export default function LobbyPage() {
             case 'game_state':
               handleGameStateUpdate(message)
               break
+            case 'current_players': // Added handler for current_players event
+              handleCurrentPlayers(message)
+              break
           }
         })
         
@@ -79,13 +82,9 @@ export default function LobbyPage() {
         
         // Send player join message
         setTimeout(() => {
-          ws.sendMessage({
-            type: 'player_join',
+          ws.emit('player_join', {
             playerId: currentPlayer.id,
-            data: {
-              player: currentPlayer,
-              timestamp: Date.now()
-            },
+            player: currentPlayer,
             timestamp: Date.now()
           })
         }, 1000)
@@ -120,39 +119,39 @@ export default function LobbyPage() {
     }
   }, [])
 
-  // Handle player join
+  // Handle incoming messages
   const handlePlayerJoin = (message: LobbyMessage) => {
-    const newPlayer = message.data.player
-    if (newPlayer && newPlayer.id !== currentPlayerRef.current?.id) {
-      setGameState(prev => ({
-        ...prev,
-        players: [...prev.players, newPlayer]
-      }))
-      console.log('Player joined:', newPlayer.nama)
-    }
-  }
-
-  // Handle player leave
-  const handlePlayerLeave = (message: LobbyMessage) => {
-    const playerId = message.playerId
+    console.log('👥 Player joined:', message.data.player);
     setGameState(prev => ({
       ...prev,
-      players: prev.players.filter(p => p.id !== playerId)
-    }))
-    console.log('Player left:', playerId)
-  }
+      players: [...prev.players, message.data.player as Player]
+    }));
+  };
 
-  // Handle game state update
+  const handlePlayerLeave = (message: LobbyMessage) => {
+    console.log('👋 Player left:', message.playerId);
+    setGameState(prev => ({
+      ...prev,
+      players: prev.players.filter(p => p.id !== message.playerId)
+    }));
+  };
+
   const handleGameStateUpdate = (message: LobbyMessage) => {
-    const gameData = message.data
-    if (gameData) {
-      setGameState(prev => ({
-        ...prev,
-        status: (gameData.status as 'waiting' | 'starting' | 'playing' | 'finished') || prev.status,
-        timeLeft: gameData.timeLeft || prev.timeLeft
-      }))
-    }
-  }
+    console.log('🎮 Game state updated:', message.data);
+    setGameState(prev => ({
+      ...prev,
+      status: message.data.status as 'waiting' | 'starting' | 'playing' | 'finished',
+      timeLeft: message.data.timeLeft || prev.timeLeft
+    }));
+  };
+
+  const handleCurrentPlayers = (message: LobbyMessage) => {
+    console.log('📋 Received current players:', message.data.players);
+    setGameState(prev => ({
+      ...prev,
+      players: message.data.players as Player[]
+    }));
+  };
 
   const merahPlayers = gameState.players.filter(p => p.tim === 'merah')
   const putihPlayers = gameState.players.filter(p => p.tim === 'putih')
