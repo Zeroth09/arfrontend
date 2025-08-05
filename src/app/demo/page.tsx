@@ -30,6 +30,8 @@ interface GameState {
   maxAmmo: number
   recoilOffset: { x: number; y: number }
   isRecoiling: boolean
+  gyroEnabled: boolean
+  gyroOffset: { x: number; y: number }
 }
 
 interface GPSData {
@@ -52,7 +54,9 @@ export default function DemoPage() {
     weaponAmmo: 30,
     maxAmmo: 30,
     recoilOffset: { x: 0, y: 0 },
-    isRecoiling: false
+    isRecoiling: false,
+    gyroEnabled: false,
+    gyroOffset: { x: 0, y: 0 }
   })
 
   const [isConnected, setIsConnected] = useState(false)
@@ -66,6 +70,7 @@ export default function DemoPage() {
   const gameContainerRef = useRef<HTMLDivElement>(null)
   const gameTimerRef = useRef<NodeJS.Timeout | null>(null)
   const gpsIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const gyroRef = useRef<{ alpha: number; beta: number; gamma: number } | null>(null)
 
   // Initialize multiplayer connection
   useEffect(() => {
@@ -289,11 +294,11 @@ export default function DemoPage() {
         multiplayer.sendShoot('target', gameState.crosshairPosition)
       }
 
-      // Simulate hit detection with recoil offset
+      // Simulate hit detection with recoil and gyro offset
       const hitTarget = gameState.players.find(player => 
         player.isAlive && 
-        Math.abs(player.position.x - (gameState.crosshairPosition.x + gameState.recoilOffset.x)) < 50 &&
-        Math.abs(player.position.y - (gameState.crosshairPosition.y + gameState.recoilOffset.y)) < 50
+        Math.abs(player.position.x - (gameState.crosshairPosition.x + gameState.recoilOffset.x + gameState.gyroOffset.x)) < 50 &&
+        Math.abs(player.position.y - (gameState.crosshairPosition.y + gameState.recoilOffset.y + gameState.gyroOffset.y)) < 50
       )
 
       if (hitTarget) {
@@ -356,7 +361,9 @@ export default function DemoPage() {
       weaponAmmo: 30,
       maxAmmo: 30,
       recoilOffset: { x: 0, y: 0 },
-      isRecoiling: false
+      isRecoiling: false,
+      gyroEnabled: false,
+      gyroOffset: { x: 0, y: 0 }
     })
 
     setDetectedHumans([])
@@ -431,6 +438,83 @@ export default function DemoPage() {
     return R * c
   }
 
+  // Gyro control functions
+  const enableGyro = () => {
+    if ('DeviceOrientationEvent' in window) {
+      // Request permission for iOS
+      const DeviceOrientationEventWithPermission = DeviceOrientationEvent as typeof DeviceOrientationEvent & {
+        requestPermission?: () => Promise<string>
+      }
+      
+      if (typeof DeviceOrientationEventWithPermission.requestPermission === 'function') {
+        DeviceOrientationEventWithPermission.requestPermission()
+          .then((permission: string) => {
+            if (permission === 'granted') {
+              startGyroTracking()
+            } else {
+              alert('Izin gyro diperlukan untuk kontrol yang lebih baik')
+            }
+          })
+          .catch((error: unknown) => {
+            console.error('Gyro permission error:', error)
+            alert('Gagal mengaktifkan gyro')
+          })
+      } else {
+        // For Android and other devices
+        startGyroTracking()
+      }
+    } else {
+      alert('Gyro tidak tersedia di device ini')
+    }
+  }
+
+  const disableGyro = () => {
+    setGameState(prev => ({
+      ...prev,
+      gyroEnabled: false,
+      gyroOffset: { x: 0, y: 0 }
+    }))
+    gyroRef.current = null
+  }
+
+  const startGyroTracking = () => {
+    const handleOrientation = (event: DeviceOrientationEvent) => {
+      gyroRef.current = {
+        alpha: event.alpha || 0,
+        beta: event.beta || 0,
+        gamma: event.gamma || 0
+      }
+
+      if (gameState.gyroEnabled && gameContainerRef.current) {
+        const rect = gameContainerRef.current.getBoundingClientRect()
+        
+        // Convert gyro data to screen coordinates
+        // Beta (pitch) controls Y movement, Gamma (roll) controls X movement
+        const sensitivity = 2 // Adjust sensitivity
+        const maxOffset = Math.min(rect.width, rect.height) * 0.3 // 30% of screen size
+        
+        const gyroX = Math.max(-maxOffset, Math.min(maxOffset, (event.gamma || 0) * sensitivity))
+        const gyroY = Math.max(-maxOffset, Math.min(maxOffset, (event.beta || 0) * sensitivity))
+        
+        setGameState(prev => ({
+          ...prev,
+          gyroOffset: { x: gyroX, y: gyroY }
+        }))
+      }
+    }
+
+    window.addEventListener('deviceorientation', handleOrientation)
+    
+    setGameState(prev => ({
+      ...prev,
+      gyroEnabled: true
+    }))
+
+    return () => {
+      window.removeEventListener('deviceorientation', handleOrientation)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       {/* Header */}
@@ -462,8 +546,8 @@ export default function DemoPage() {
           {gameState.isRecoiling && (
             <div className="absolute w-16 h-16 pointer-events-none z-40"
               style={{
-                left: gameState.crosshairPosition.x - 32 + gameState.recoilOffset.x,
-                top: gameState.crosshairPosition.y - 32 + gameState.recoilOffset.y,
+                left: gameState.crosshairPosition.x - 32 + gameState.recoilOffset.x + gameState.gyroOffset.x,
+                top: gameState.crosshairPosition.y - 32 + gameState.recoilOffset.y + gameState.gyroOffset.y,
                 transform: 'translate(-50%, -50%)'
               }}
             >
@@ -472,14 +556,14 @@ export default function DemoPage() {
             </div>
           )}
 
-          {/* Crosshair - Always Centered with Recoil Effect */}
+          {/* Crosshair - Always Centered with Recoil and Gyro Effect */}
           <div
             className={`absolute w-8 h-8 pointer-events-none z-50 transition-transform duration-200 ${
               gameState.isRecoiling ? 'animate-pulse' : ''
             }`}
             style={{
-              left: gameState.crosshairPosition.x - 16 + gameState.recoilOffset.x,
-              top: gameState.crosshairPosition.y - 16 + gameState.recoilOffset.y,
+              left: gameState.crosshairPosition.x - 16 + gameState.recoilOffset.x + gameState.gyroOffset.x,
+              top: gameState.crosshairPosition.y - 16 + gameState.recoilOffset.y + gameState.gyroOffset.y,
               transform: 'translate(-50%, -50%)'
             }}
           >
@@ -490,7 +574,24 @@ export default function DemoPage() {
             {gameState.isRecoiling && (
               <div className="absolute inset-0 w-full h-full border-4 border-yellow-400 rounded-full animate-ping opacity-75"></div>
             )}
+            {/* Gyro indicator */}
+            {gameState.gyroEnabled && (
+              <div className="absolute -inset-2 w-12 h-12 border-2 border-cyan-400 rounded-full opacity-50 animate-pulse"></div>
+            )}
           </div>
+
+          {/* Gyro Status Indicator */}
+          {gameState.gyroEnabled && (
+            <div className="absolute top-20 left-4 bg-cyan-900/70 text-white px-3 py-2 rounded-lg z-50">
+              <div className="text-center">
+                <div className="text-lg">📱</div>
+                <div className="text-xs">GYRO ACTIVE</div>
+                <div className="text-xs">
+                  X: {gameState.gyroOffset.x.toFixed(1)} Y: {gameState.gyroOffset.y.toFixed(1)}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Human Detection Overlay */}
           {humanDetectionActive && detectedHumans.map((human, index) => (
@@ -611,6 +712,18 @@ export default function DemoPage() {
             className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg"
           >
             Reload Weapon
+          </button>
+          <button
+            onClick={enableGyro}
+            className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 rounded-lg"
+          >
+            Enable Gyro
+          </button>
+          <button
+            onClick={disableGyro}
+            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 rounded-lg"
+          >
+            Disable Gyro
           </button>
         </div>
 
