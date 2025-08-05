@@ -28,6 +28,8 @@ interface GameState {
   isAiming: boolean
   weaponAmmo: number
   maxAmmo: number
+  recoilOffset: { x: number; y: number }
+  isRecoiling: boolean
 }
 
 interface GPSData {
@@ -48,7 +50,9 @@ export default function DemoPage() {
     crosshairPosition: { x: 0, y: 0 },
     isAiming: false,
     weaponAmmo: 30,
-    maxAmmo: 30
+    maxAmmo: 30,
+    recoilOffset: { x: 0, y: 0 },
+    isRecoiling: false
   })
 
   const [isConnected, setIsConnected] = useState(false)
@@ -247,9 +251,34 @@ export default function DemoPage() {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
-  // Shooting mechanics
+  // Recoil effect
+  const applyRecoil = () => {
+    // Random recoil pattern (up and slightly random left/right)
+    const recoilX = (Math.random() - 0.5) * 20 // -10 to 10px
+    const recoilY = -30 - Math.random() * 20 // -30 to -50px (mostly upward)
+    
+    setGameState(prev => ({
+      ...prev,
+      recoilOffset: { x: recoilX, y: recoilY },
+      isRecoiling: true
+    }))
+
+    // Reset recoil after animation
+    setTimeout(() => {
+      setGameState(prev => ({
+        ...prev,
+        recoilOffset: { x: 0, y: 0 },
+        isRecoiling: false
+      }))
+    }, 200) // 200ms recoil duration
+  }
+
+  // Shooting mechanics with recoil
   const handleShoot = () => {
-    if (gameState.weaponAmmo > 0 && gameState.status === 'playing') {
+    if (gameState.weaponAmmo > 0 && gameState.status === 'playing' && !gameState.isRecoiling) {
+      // Apply recoil effect
+      applyRecoil()
+      
       setGameState(prev => ({
         ...prev,
         weaponAmmo: prev.weaponAmmo - 1
@@ -260,11 +289,11 @@ export default function DemoPage() {
         multiplayer.sendShoot('target', gameState.crosshairPosition)
       }
 
-      // Simulate hit detection
+      // Simulate hit detection with recoil offset
       const hitTarget = gameState.players.find(player => 
         player.isAlive && 
-        Math.abs(player.position.x - gameState.crosshairPosition.x) < 50 &&
-        Math.abs(player.position.y - gameState.crosshairPosition.y) < 50
+        Math.abs(player.position.x - (gameState.crosshairPosition.x + gameState.recoilOffset.x)) < 50 &&
+        Math.abs(player.position.y - (gameState.crosshairPosition.y + gameState.recoilOffset.y)) < 50
       )
 
       if (hitTarget) {
@@ -325,7 +354,9 @@ export default function DemoPage() {
       crosshairPosition: { x: 0, y: 0 },
       isAiming: false,
       weaponAmmo: 30,
-      maxAmmo: 30
+      maxAmmo: 30,
+      recoilOffset: { x: 0, y: 0 },
+      isRecoiling: false
     })
 
     setDetectedHumans([])
@@ -427,18 +458,38 @@ export default function DemoPage() {
           ref={gameContainerRef}
           className="relative w-full h-[calc(100vh-200px)] bg-gray-800 overflow-hidden"
         >
-          {/* Crosshair - Always Centered */}
+          {/* Muzzle Flash Effect */}
+          {gameState.isRecoiling && (
+            <div className="absolute w-16 h-16 pointer-events-none z-40"
+              style={{
+                left: gameState.crosshairPosition.x - 32 + gameState.recoilOffset.x,
+                top: gameState.crosshairPosition.y - 32 + gameState.recoilOffset.y,
+                transform: 'translate(-50%, -50%)'
+              }}
+            >
+              <div className="w-full h-full bg-yellow-400 rounded-full animate-ping opacity-80"></div>
+              <div className="absolute inset-0 w-full h-full bg-orange-500 rounded-full animate-pulse"></div>
+            </div>
+          )}
+
+          {/* Crosshair - Always Centered with Recoil Effect */}
           <div
-            className="absolute w-8 h-8 pointer-events-none z-50"
+            className={`absolute w-8 h-8 pointer-events-none z-50 transition-transform duration-200 ${
+              gameState.isRecoiling ? 'animate-pulse' : ''
+            }`}
             style={{
-              left: gameState.crosshairPosition.x - 16,
-              top: gameState.crosshairPosition.y - 16,
+              left: gameState.crosshairPosition.x - 16 + gameState.recoilOffset.x,
+              top: gameState.crosshairPosition.y - 16 + gameState.recoilOffset.y,
               transform: 'translate(-50%, -50%)'
             }}
           >
             <div className="w-full h-full border-2 border-red-500 rounded-full flex items-center justify-center">
               <div className="w-2 h-2 bg-red-500 rounded-full"></div>
             </div>
+            {/* Recoil flash effect */}
+            {gameState.isRecoiling && (
+              <div className="absolute inset-0 w-full h-full border-4 border-yellow-400 rounded-full animate-ping opacity-75"></div>
+            )}
           </div>
 
           {/* Human Detection Overlay */}
@@ -476,17 +527,19 @@ export default function DemoPage() {
           <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-50">
             <button
               onClick={handleShoot}
-              disabled={gameState.weaponAmmo <= 0 || gameState.status !== 'playing'}
+              disabled={gameState.weaponAmmo <= 0 || gameState.status !== 'playing' || gameState.isRecoiling}
               className={`
                 w-24 h-24 rounded-full border-4 font-bold text-white text-lg
                 transition-all duration-200 transform hover:scale-110 active:scale-95
-                ${gameState.weaponAmmo > 0 && gameState.status === 'playing'
-                  ? 'bg-red-600 hover:bg-red-700 border-red-400 shadow-lg shadow-red-500/50'
-                  : 'bg-gray-600 border-gray-400 cursor-not-allowed'
+                ${gameState.isRecoiling 
+                  ? 'bg-orange-600 border-orange-400 animate-pulse cursor-not-allowed'
+                  : gameState.weaponAmmo > 0 && gameState.status === 'playing'
+                    ? 'bg-red-600 hover:bg-red-700 border-red-400 shadow-lg shadow-red-500/50'
+                    : 'bg-gray-600 border-gray-400 cursor-not-allowed'
                 }
               `}
             >
-              🔫 FIRE
+              {gameState.isRecoiling ? '💥 RECOIL' : '🔫 FIRE'}
             </button>
           </div>
 
