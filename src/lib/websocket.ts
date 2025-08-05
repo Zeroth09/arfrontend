@@ -42,7 +42,9 @@ export class MultiplayerWebSocket {
         autoConnect: true,
         reconnection: true,
         reconnectionAttempts: this.maxReconnectAttempts,
-        reconnectionDelay: this.reconnectDelay
+        reconnectionDelay: this.reconnectDelay,
+        timeout: 10000,
+        forceNew: true
       })
 
       this.socket.on('connect', () => {
@@ -58,12 +60,19 @@ export class MultiplayerWebSocket {
         console.log('📤 Sent player_join event for player:', this.playerId)
       })
 
-      this.socket.on('disconnect', () => {
-        console.log('Socket.io disconnected')
+      this.socket.on('disconnect', (reason) => {
+        console.log('🔌 Socket.io disconnected:', reason)
+        if (reason === 'io server disconnect') {
+          // the disconnection was initiated by the server, you need to reconnect manually
+          console.log('🔄 Server disconnected, attempting to reconnect...')
+          this.socket?.connect()
+        }
       })
 
       this.socket.on('connect_error', (error) => {
-        console.error('Socket.io connection error:', error)
+        console.error('❌ Socket.io connection error:', error)
+        console.error('🔗 Server URL:', this.serverUrl)
+        console.error('🆔 Player ID:', this.playerId)
       })
 
       // Handle server status
@@ -230,9 +239,23 @@ export class MultiplayerWebSocket {
   // Public method to emit events directly
   emit(event: string, data: Record<string, unknown>): void {
     if (this.socket && this.socket.connected) {
+      console.log(`📤 Emitting ${event}:`, data)
       this.socket.emit(event, data)
     } else {
-      console.warn('Socket not connected, event not sent:', event, data)
+      console.warn('⚠️ Socket not connected, event not sent:', event, data)
+      // Try to reconnect and emit after a delay
+      if (this.socket) {
+        console.log('🔄 Attempting to reconnect and retry emit...')
+        this.socket.connect()
+        setTimeout(() => {
+          if (this.socket && this.socket.connected) {
+            console.log(`📤 Retrying emit ${event}:`, data)
+            this.socket.emit(event, data)
+          } else {
+            console.error(`❌ Failed to emit ${event} after reconnect attempt`)
+          }
+        }, 2000)
+      }
     }
   }
 } 
