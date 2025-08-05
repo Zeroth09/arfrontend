@@ -3,7 +3,7 @@ import { ApiResponse, LoginRequest, RegisterRequest, AuthResponse, GameRoom, Use
 const API_BASE_URL = 'https://backend-production-9ccf.up.railway.app'
 
 // Test API connection
-export const testAPIConnection = async (): Promise<{ success: boolean; message: string; response?: any }> => {
+export const testAPIConnection = async (): Promise<{ success: boolean; message: string; response?: unknown }> => {
   try {
     console.log('Testing API connection to:', API_BASE_URL)
     

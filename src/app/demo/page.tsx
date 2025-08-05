@@ -31,7 +31,6 @@ export default function DemoPage() {
     gameTime: 0
   })
 
-  const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null)
   const [cameraView, setCameraView] = useState<'overview' | 'player1' | 'player2'>('overview')
 
   // Initialize demo players
@@ -189,12 +188,6 @@ export default function DemoPage() {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs.toString().padStart(2, '0')}`
-  }
-
-  const getPlayerByView = () => {
-    if (cameraView === 'player1') return gameState.players.find(p => p.id === 'player1')
-    if (cameraView === 'player2') return gameState.players.find(p => p.id === 'player2')
-    return null
   }
 
   return (
