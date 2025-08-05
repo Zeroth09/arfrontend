@@ -206,13 +206,22 @@ export default function DemoPage() {
     // Check if crosshair is on target
     const targetPlayer = gameState.players.find(p => p.id !== gameState.currentPlayer && p.isAlive)
     if (targetPlayer) {
-      // Simple hit detection based on crosshair position
-      const hitChance = Math.random()
-      if (hitChance > 0.7) { // 30% hit chance
+      // Calculate distance from crosshair to target
+      const targetX = targetPlayer.position.x
+      const targetY = targetPlayer.position.y
+      const crosshairX = gameState.crosshairPosition.x
+      const crosshairY = gameState.crosshairPosition.y
+      
+      const distance = Math.sqrt(
+        Math.pow(crosshairX - targetX, 2) + Math.pow(crosshairY - targetY, 2)
+      )
+      
+      // Hit if crosshair is within 50px of target
+      if (distance < 50) {
         simulateKill(gameState.currentPlayer!, targetPlayer.id)
-        console.log('Target hit!')
+        console.log('Target hit! Distance:', distance.toFixed(1), 'px')
       } else {
-        console.log('Miss!')
+        console.log('Miss! Distance:', distance.toFixed(1), 'px')
       }
     }
   }
@@ -416,7 +425,19 @@ export default function DemoPage() {
         <div className="card mb-6">
           <h3 className="text-xl font-bold text-white mb-4">📱 AR Camera View</h3>
           
-          <div className="relative bg-black rounded-lg overflow-hidden">
+          <div 
+            className="relative bg-black rounded-lg overflow-hidden cursor-none"
+            onMouseMove={handleMouseMove}
+            onMouseEnter={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect()
+              const x = e.clientX - rect.left
+              const y = e.clientY - rect.top
+              setGameState(prev => ({
+                ...prev,
+                crosshairPosition: { x, y }
+              }))
+            }}
+          >
             {/* Camera Feed */}
             <video
               ref={videoRef}
@@ -435,15 +456,22 @@ export default function DemoPage() {
 
             {/* Crosshair */}
             <div
-              className="absolute w-8 h-8 pointer-events-none"
+              className="absolute w-8 h-8 pointer-events-none z-10"
               style={{
                 left: gameState.crosshairPosition.x - 16,
                 top: gameState.crosshairPosition.y - 16,
                 transform: 'translate(-50%, -50%)'
               }}
             >
-              <div className="w-8 h-8 border-2 border-red-500 rounded-full flex items-center justify-center">
+              <div className="w-8 h-8 border-2 border-red-500 rounded-full flex items-center justify-center bg-black/20">
                 <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+              </div>
+              {/* Crosshair lines */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-8 h-0.5 bg-red-500"></div>
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="h-8 w-0.5 bg-red-500"></div>
               </div>
             </div>
 
@@ -465,6 +493,24 @@ export default function DemoPage() {
               </div>
             ))}
 
+            {/* Target Indicators for Testing */}
+            {gameState.players.map((player) => (
+              <div
+                key={player.id}
+                className={`absolute w-16 h-16 rounded-full flex items-center justify-center text-white font-bold border-4 ${
+                  player.isAlive
+                    ? player.tim === 'merah' ? 'border-red-500 bg-red-500/50' : 'border-white bg-white/50 text-gray-900'
+                    : 'border-gray-500 bg-gray-500/50'
+                }`}
+                style={{
+                  left: player.position.x - 32,
+                  top: player.position.y - 32
+                }}
+              >
+                {player.id === 'player1' ? 'P1' : 'P2'}
+              </div>
+            ))}
+
             {/* Controls Overlay */}
             <div className="absolute bottom-4 left-4 right-4 flex justify-between">
               <button
@@ -481,6 +527,11 @@ export default function DemoPage() {
               >
                 🔄 Reload
               </button>
+            </div>
+
+            {/* Crosshair Position Info */}
+            <div className="absolute top-4 left-4 bg-black/50 text-white px-3 py-1 rounded-lg text-sm">
+              Crosshair: ({gameState.crosshairPosition.x.toFixed(0)}, {gameState.crosshairPosition.y.toFixed(0)})
             </div>
           </div>
 
