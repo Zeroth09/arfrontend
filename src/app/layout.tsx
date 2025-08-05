@@ -5,17 +5,11 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: '🎮 Airsoft AR Battle',
-  description: 'Real-time PvP dengan GPS + Human Detection menggunakan Next.js',
-  manifest: '/manifest.json',
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-    viewportFit: 'cover',
-  },
-  themeColor: '#000000',
+  title: 'Airsoft AR - Battle Proximity',
+  description: 'Game PVP airsoft augmented reality yang seru dan menantang',
+  keywords: 'airsoft, AR, augmented reality, game, PVP, battle',
+  authors: [{ name: 'Airsoft AR Team' }],
+  viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
 }
 
 export default function RootLayout({
@@ -25,16 +19,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="id">
-      <head>
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Airsoft AR Battle" />
-        <meta name="application-name" content="Airsoft AR Battle" />
-        <meta name="msapplication-TileColor" content="#000000" />
-        <meta name="msapplication-tap-highlight" content="no" />
-      </head>
-      <body className={inter.className}>{children}</body>
+      <body className={`${inter.className} bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 min-h-screen`}>
+        {children}
+      </body>
     </html>
   )
 } 
