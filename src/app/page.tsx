@@ -43,8 +43,15 @@ export default function HomePage() {
     
     // Simulate API call
     setTimeout(() => {
-      // Store player data in localStorage
-      localStorage.setItem('playerData', JSON.stringify(playerData))
+      // Store complete player data in localStorage
+      const completePlayerData = {
+        id: Math.random().toString(36).substr(2, 9),
+        nama: playerData.nama,
+        tim: playerData.tim,
+        joinedAt: new Date().toISOString()
+      }
+      
+      localStorage.setItem('playerData', JSON.stringify(completePlayerData))
       setIsSubmitting(false)
       // Redirect to lobby
       window.location.href = '/lobby'

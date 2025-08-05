@@ -29,11 +29,35 @@ export default function LobbyPage() {
   useEffect(() => {
     const playerData = localStorage.getItem('playerData')
     if (playerData) {
-      const currentPlayer: Player = JSON.parse(playerData)
-      setGameState(prev => ({
-        ...prev,
-        players: [currentPlayer]
-      }))
+      try {
+        const rawData = JSON.parse(playerData)
+        
+        // Create player object with required fields
+        const currentPlayer: Player = {
+          id: rawData.id || Math.random().toString(36).substr(2, 9),
+          nama: rawData.nama || 'Unknown Player',
+          tim: rawData.tim || 'merah',
+          joinedAt: rawData.joinedAt ? new Date(rawData.joinedAt) : new Date()
+        }
+        
+        setGameState(prev => ({
+          ...prev,
+          players: [currentPlayer]
+        }))
+      } catch (error) {
+        console.error('Error parsing player data:', error)
+        // Fallback player data
+        const fallbackPlayer: Player = {
+          id: Math.random().toString(36).substr(2, 9),
+          nama: 'Player',
+          tim: 'merah',
+          joinedAt: new Date()
+        }
+        setGameState(prev => ({
+          ...prev,
+          players: [fallbackPlayer]
+        }))
+      }
     }
   }, [])
 
