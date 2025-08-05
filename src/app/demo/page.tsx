@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { DemoMultiplayer, GameMessage, PlayerData } from '@/lib/websocket'
 
 interface Player {
   id: string
@@ -58,13 +59,70 @@ export default function DemoPage() {
   const [gpsData, setGpsData] = useState<GPSData | null>(null)
   const [isGPSEnabled, setIsGPSEnabled] = useState(false)
   const [humanDetection, setHumanDetection] = useState<{ x: number; y: number; confidence: number }[]>([])
+  const [multiplayer, setMultiplayer] = useState<DemoMultiplayer | null>(null)
+  const [isConnected, setIsConnected] = useState(false)
+  const [otherPlayers, setOtherPlayers] = useState<PlayerData[]>([])
   
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
 
-  // Initialize demo players with GPS coordinates
+  // Initialize multiplayer connection
   useEffect(() => {
+    const playerId = gameState.currentPlayer || 'player1'
+    const demoMultiplayer = new DemoMultiplayer(playerId)
+    
+    // Set up event handlers
+    demoMultiplayer.on('player_join', (data) => {
+      console.log('Player joined:', data)
+      setOtherPlayers(prev => [...prev, data.player])
+    })
+
+    demoMultiplayer.on('position_update', (data) => {
+      console.log('Position update:', data)
+      setGameState(prev => ({
+        ...prev,
+        players: prev.players.map(p => 
+          p.id === data.playerId 
+            ? { ...p, position: data.position, gps: data.gps, lastSeen: new Date() }
+            : p
+        )
+      }))
+    })
+
+    demoMultiplayer.on('hit', (data) => {
+      console.log('Hit detected:', data)
+      setGameState(prev => ({
+        ...prev,
+        players: prev.players.map(p => {
+          if (p.id === data.targetId) {
+            return { ...p, health: Math.max(0, p.health - data.damage) }
+          }
+          if (p.id === data.shooterId) {
+            return { ...p, kills: p.kills + 1 }
+          }
+          return p
+        })
+      }))
+    })
+
+    demoMultiplayer.on('elimination', (data) => {
+      console.log('Player eliminated:', data)
+      setGameState(prev => ({
+        ...prev,
+        players: prev.players.map(p => 
+          p.id === data.targetId 
+            ? { ...p, isAlive: false, health: 0, deaths: p.deaths + 1 }
+            : p
+        )
+      }))
+    })
+
+    setMultiplayer(demoMultiplayer)
+    demoMultiplayer.connect()
+    setIsConnected(true)
+
+    // Initialize demo players
     const demoPlayers: Player[] = [
       {
         id: 'player1',
@@ -75,7 +133,7 @@ export default function DemoPage() {
         kills: 0,
         deaths: 0,
         position: { x: 100, y: 100 },
-        gps: { lat: -6.2088, lng: 106.8456 }, // Jakarta coordinates
+        gps: { lat: -6.2088, lng: 106.8456 },
         lastSeen: new Date(),
         isVisible: true
       },
@@ -88,7 +146,7 @@ export default function DemoPage() {
         kills: 0,
         deaths: 0,
         position: { x: 400, y: 300 },
-        gps: { lat: -6.2089, lng: 106.8457 }, // Slightly different coordinates
+        gps: { lat: -6.2089, lng: 106.8457 },
         lastSeen: new Date(),
         isVisible: true
       }
@@ -97,8 +155,12 @@ export default function DemoPage() {
     setGameState(prev => ({
       ...prev,
       players: demoPlayers,
-      currentPlayer: 'player1' // Default to player 1
+      currentPlayer: playerId
     }))
+
+    return () => {
+      demoMultiplayer.disconnect()
+    }
   }, [])
 
   // GPS Location tracking
@@ -223,7 +285,7 @@ export default function DemoPage() {
 
     // Check if any target is in crosshair (center screen)
     const targetPlayer = gameState.players.find(p => p.id !== gameState.currentPlayer && p.isAlive)
-    if (targetPlayer) {
+    if (targetPlayer && multiplayer) {
       // Calculate distance from screen center to target
       const targetX = targetPlayer.position.x
       const targetY = targetPlayer.position.y
@@ -236,7 +298,18 @@ export default function DemoPage() {
       
       // Hit if target is within 100px of screen center (more realistic for AR)
       if (distance < 100) {
-        simulateKill(gameState.currentPlayer!, targetPlayer.id)
+        // Send shoot message to multiplayer
+        multiplayer.sendMessage({
+          type: 'shoot',
+          playerId: gameState.currentPlayer!,
+          data: { 
+            targetId: targetPlayer.id, 
+            crosshairPosition: { x: centerX, y: centerY },
+            timestamp: Date.now()
+          },
+          timestamp: Date.now()
+        })
+        
         console.log('Target hit! Distance:', distance.toFixed(1), 'px')
       } else {
         console.log('Miss! Distance:', distance.toFixed(1), 'px')
@@ -418,6 +491,21 @@ export default function DemoPage() {
               {gameState.status === 'playing' && 'AR Battle Sedang Berlangsung'}
               {gameState.status === 'finished' && 'Game Selesai'}
             </h2>
+
+            {/* Multiplayer Status */}
+            <div className="mb-4">
+              <div className={`inline-flex items-center space-x-2 px-4 py-2 rounded-lg ${
+                isConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+              }`}>
+                <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                <span className="font-semibold">
+                  {isConnected ? '🟢 Multiplayer Connected' : '🔴 Multiplayer Disconnected'}
+                </span>
+              </div>
+              <div className="text-sm text-gray-400 mt-2">
+                Players Online: {gameState.players.length + otherPlayers.length}
+              </div>
+            </div>
 
             {gameState.status === 'countdown' && (
               <div className="text-4xl font-bold text-yellow-400 animate-pulse">
