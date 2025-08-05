@@ -1,6 +1,6 @@
 import { ApiResponse, LoginRequest, RegisterRequest, AuthResponse, GameRoom, User, UserStats } from '@/types'
 
-const API_BASE_URL = 'https://shaky-meeting-production.up.railway.app'
+const API_BASE_URL = 'https://backendairsoftar-production.up.railway.app'
 
 // Test API connection
 export const testAPIConnection = async (): Promise<{ success: boolean; message: string; response?: unknown }> => {
