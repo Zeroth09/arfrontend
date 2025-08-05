@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { DemoMultiplayer, PlayerData } from '@/lib/websocket'
 
 interface Player {
   id: string
@@ -55,74 +54,16 @@ export default function DemoPage() {
   // Calculate center position for crosshair
   const [screenCenter, setScreenCenter] = useState({ x: 0, y: 0 })
 
-  const [cameraView] = useState<'overview' | 'player1' | 'player2'>('overview')
   const [gpsData, setGpsData] = useState<GPSData | null>(null)
   const [isGPSEnabled, setIsGPSEnabled] = useState(false)
   const [humanDetection, setHumanDetection] = useState<{ x: number; y: number; confidence: number }[]>([])
-  const [multiplayer, setMultiplayer] = useState<DemoMultiplayer | null>(null)
-  const [isConnected, setIsConnected] = useState(false)
-  const [otherPlayers, setOtherPlayers] = useState<PlayerData[]>([])
   
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
 
-  // Initialize multiplayer connection
+  // Initialize demo players
   useEffect(() => {
-    const playerId = gameState.currentPlayer || 'player1'
-    const demoMultiplayer = new DemoMultiplayer(playerId)
-    
-    // Set up event handlers
-    demoMultiplayer.on('player_join', (data) => {
-      console.log('Player joined:', data)
-      setOtherPlayers(prev => [...prev, data.player])
-    })
-
-    demoMultiplayer.on('position_update', (data) => {
-      console.log('Position update:', data)
-      setGameState(prev => ({
-        ...prev,
-        players: prev.players.map(p => 
-          p.id === data.playerId 
-            ? { ...p, position: data.position, gps: data.gps, lastSeen: new Date() }
-            : p
-        )
-      }))
-    })
-
-    demoMultiplayer.on('hit', (data) => {
-      console.log('Hit detected:', data)
-      setGameState(prev => ({
-        ...prev,
-        players: prev.players.map(p => {
-          if (p.id === data.targetId) {
-            return { ...p, health: Math.max(0, p.health - data.damage) }
-          }
-          if (p.id === data.shooterId) {
-            return { ...p, kills: p.kills + 1 }
-          }
-          return p
-        })
-      }))
-    })
-
-    demoMultiplayer.on('elimination', (data) => {
-      console.log('Player eliminated:', data)
-      setGameState(prev => ({
-        ...prev,
-        players: prev.players.map(p => 
-          p.id === data.targetId 
-            ? { ...p, isAlive: false, health: 0, deaths: p.deaths + 1 }
-            : p
-        )
-      }))
-    })
-
-    setMultiplayer(demoMultiplayer)
-    demoMultiplayer.connect()
-    setIsConnected(true)
-
-    // Initialize demo players
     const demoPlayers: Player[] = [
       {
         id: 'player1',
@@ -155,12 +96,8 @@ export default function DemoPage() {
     setGameState(prev => ({
       ...prev,
       players: demoPlayers,
-      currentPlayer: playerId
+      currentPlayer: 'player1'
     }))
-
-    return () => {
-      demoMultiplayer.disconnect()
-    }
   }, [])
 
   // GPS Location tracking
@@ -258,12 +195,10 @@ export default function DemoPage() {
     }, 3000) // Move targets every 3 seconds
   }
 
-  // Calculate screen center for crosshair
   const calculateScreenCenter = (element: HTMLDivElement) => {
     const rect = element.getBoundingClientRect()
     const centerX = rect.width / 2
     const centerY = rect.height / 2
-    
     setScreenCenter({ x: centerX, y: centerY })
     setGameState(prev => ({
       ...prev,
@@ -271,176 +206,71 @@ export default function DemoPage() {
     }))
   }
 
-  // Handle shooting
   const handleShoot = () => {
-    if (gameState.weaponAmmo <= 0) {
-      console.log('Out of ammo!')
-      return
-    }
+    if (gameState.weaponAmmo > 0) {
+      setGameState(prev => ({
+        ...prev,
+        weaponAmmo: prev.weaponAmmo - 1
+      }))
 
-    setGameState(prev => ({
-      ...prev,
-      weaponAmmo: prev.weaponAmmo - 1
-    }))
+      // Simulate shot
+      console.log('🔫 Shot fired!')
+      
+      // Check if any player is hit (simple collision detection)
+      const crosshair = gameState.crosshairPosition
+      const hitPlayer = gameState.players.find(player => {
+        const distance = Math.sqrt(
+          Math.pow(player.position.x - crosshair.x, 2) + 
+          Math.pow(player.position.y - crosshair.y, 2)
+        )
+        return distance < 50 && player.isAlive // Hit if within 50px
+      })
 
-    // Check if any target is in crosshair (center screen)
-    const targetPlayer = gameState.players.find(p => p.id !== gameState.currentPlayer && p.isAlive)
-    if (targetPlayer && multiplayer) {
-      // Calculate distance from screen center to target
-      const targetX = targetPlayer.position.x
-      const targetY = targetPlayer.position.y
-      const centerX = screenCenter.x
-      const centerY = screenCenter.y
-      
-      const distance = Math.sqrt(
-        Math.pow(centerX - targetX, 2) + Math.pow(centerY - targetY, 2)
-      )
-      
-      // Hit if target is within 100px of screen center (more realistic for AR)
-      if (distance < 100) {
-        // Send shoot message to multiplayer
-        multiplayer.sendMessage({
-          type: 'shoot',
-          playerId: gameState.currentPlayer!,
-                  data: { 
-          crosshairPosition: { x: centerX, y: centerY },
-          timestamp: Date.now()
-        },
-          timestamp: Date.now()
-        })
-        
-        console.log('Target hit! Distance:', distance.toFixed(1), 'px')
-      } else {
-        console.log('Miss! Distance:', distance.toFixed(1), 'px')
+      if (hitPlayer) {
+        console.log(`🎯 Hit ${hitPlayer.nama}!`)
+        setGameState(prev => ({
+          ...prev,
+          players: prev.players.map(p => {
+            if (p.id === hitPlayer.id) {
+              const newHealth = Math.max(0, p.health - 25)
+              return {
+                ...p,
+                health: newHealth,
+                isAlive: newHealth > 0,
+                deaths: newHealth === 0 ? p.deaths + 1 : p.deaths
+              }
+            }
+            return p
+          })
+        }))
       }
     }
   }
-
-  // Game timer
-  useEffect(() => {
-    if (gameState.status === 'playing') {
-      const timer = setInterval(() => {
-        setGameState(prev => {
-          const newTimeLeft = prev.timeLeft - 1
-          const newGameTime = prev.gameTime + 1
-
-          if (newTimeLeft <= 0) {
-            const merahAlive = prev.players.filter(p => p.tim === 'merah' && p.isAlive).length
-            const putihAlive = prev.players.filter(p => p.tim === 'putih' && p.isAlive).length
-            const winner = merahAlive > putihAlive ? 'merah' : 'putih'
-            
-            return {
-              ...prev,
-              status: 'finished',
-              timeLeft: 0,
-              winner,
-              gameTime: newGameTime
-            }
-          }
-
-          return {
-            ...prev,
-            timeLeft: newTimeLeft,
-            gameTime: newGameTime
-          }
-        })
-      }, 1000)
-
-      return () => clearInterval(timer)
-    }
-  }, [gameState.status])
 
   const startGame = () => {
     setGameState(prev => ({
       ...prev,
-      status: 'countdown'
+      status: 'playing',
+      gameTime: Date.now()
     }))
-
-    setTimeout(() => {
-      setGameState(prev => ({
-        ...prev,
-        status: 'playing'
-      }))
-    }, 3000)
   }
 
   const resetGame = () => {
-    setGameState({
+    setGameState(prev => ({
+      ...prev,
       status: 'waiting',
       timeLeft: 300,
-      players: [
-        {
-          id: 'player1',
-          nama: 'Player 1 (Merah)',
-          tim: 'merah',
-          isAlive: true,
-          health: 100,
-          kills: 0,
-          deaths: 0,
-          position: { x: 100, y: 100 },
-          gps: { lat: -6.2088, lng: 106.8456 },
-          lastSeen: new Date(),
-          isVisible: true
-        },
-        {
-          id: 'player2',
-          nama: 'Player 2 (Putih)',
-          tim: 'putih',
-          isAlive: true,
-          health: 100,
-          kills: 0,
-          deaths: 0,
-          position: { x: 400, y: 300 },
-          gps: { lat: -6.2089, lng: 106.8457 },
-          lastSeen: new Date(),
-          isVisible: true
-        }
-      ],
+      players: prev.players.map(p => ({
+        ...p,
+        health: 100,
+        kills: 0,
+        deaths: 0,
+        isAlive: true
+      })),
       winner: null,
       gameTime: 0,
-      currentPlayer: 'player1',
-      crosshairPosition: { x: 0, y: 0 },
-      isAiming: false,
-      weaponAmmo: 30,
-      maxAmmo: 30
-    })
-  }
-
-  const simulateKill = (killerId: string, victimId: string) => {
-    setGameState(prev => {
-      const updatedPlayers = prev.players.map(player => {
-        if (player.id === killerId) {
-          return { ...player, kills: player.kills + 1 }
-        }
-        if (player.id === victimId) {
-          return { 
-            ...player, 
-            isAlive: false, 
-            deaths: player.deaths + 1,
-            health: 0
-          }
-        }
-        return player
-      })
-
-      const merahAlive = updatedPlayers.filter(p => p.tim === 'merah' && p.isAlive).length
-      const putihAlive = updatedPlayers.filter(p => p.tim === 'putih' && p.isAlive).length
-
-      if (merahAlive === 0 || putihAlive === 0) {
-        const winner = merahAlive === 0 ? 'putih' : 'merah'
-        return {
-          ...prev,
-          players: updatedPlayers,
-          status: 'finished',
-          winner
-        }
-      }
-
-      return {
-        ...prev,
-        players: updatedPlayers
-      }
-    })
+      weaponAmmo: 30
+    }))
   }
 
   const reloadWeapon = () => {
@@ -464,380 +294,182 @@ export default function DemoPage() {
               Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
               Math.sin(dLng/2) * Math.sin(dLng/2)
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
-    return R * c * 1000 // Convert to meters
+    return R * c
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900 p-4">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-8">
           <Link href="/" className="text-white hover:text-blue-400 transition-colors">
             ← Kembali ke Home
           </Link>
-          <h1 className="text-3xl font-bold text-glow">AR Airsoft Demo</h1>
-          <div className="text-white text-sm">
-            GPS + Camera + Human Detection
+          <h1 className="text-3xl font-bold text-glow">Demo AR Battle</h1>
+          <div className="text-white">
+            <span className="mr-4">Ammo: {gameState.weaponAmmo}/{gameState.maxAmmo}</span>
+            <button 
+              onClick={reloadWeapon}
+              className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm"
+            >
+              Reload
+            </button>
           </div>
         </div>
 
         {/* Game Status */}
-        <div className="card mb-6">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-white mb-4">
-              {gameState.status === 'waiting' && 'Menunggu Game Dimulai...'}
-              {gameState.status === 'countdown' && 'Game Akan Dimulai...'}
-              {gameState.status === 'playing' && 'AR Battle Sedang Berlangsung'}
-              {gameState.status === 'finished' && 'Game Selesai'}
-            </h2>
-
-            {/* Multiplayer Status */}
-            <div className="mb-4">
-              <div className={`inline-flex items-center space-x-2 px-4 py-2 rounded-lg ${
-                isConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-              }`}>
-                <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                <span className="font-semibold">
-                  {isConnected ? '🟢 Multiplayer Connected' : '🔴 Multiplayer Disconnected'}
-                </span>
-              </div>
-              <div className="text-sm text-gray-400 mt-2">
-                Players Online: {gameState.players.length + otherPlayers.length}
-              </div>
-            </div>
-
-            {gameState.status === 'countdown' && (
-              <div className="text-4xl font-bold text-yellow-400 animate-pulse">
-                Game akan dimulai dalam 3 detik...
-              </div>
-            )}
-
-            {gameState.status === 'playing' && (
-              <div className="text-3xl font-bold text-green-400">
-                ⏱️ {formatTime(gameState.timeLeft)}
-              </div>
-            )}
-
-            {gameState.status === 'finished' && (
-              <div className="text-3xl font-bold text-yellow-400">
-                🏆 Tim {gameState.winner === 'merah' ? 'Merah' : 'Putih'} Menang!
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* AR Camera View */}
-        <div className="card mb-6">
-          <h3 className="text-xl font-bold text-white mb-4">📱 AR Camera View</h3>
-          
-          <div 
-            ref={(element) => {
-              if (element) {
-                calculateScreenCenter(element)
-              }
-            }}
-            className="relative bg-black rounded-lg overflow-hidden"
-          >
-            {/* Camera Feed */}
-            <video
-              ref={videoRef}
-              className="w-full h-96 object-cover"
-              autoPlay
-              muted
-              playsInline
-            />
-            
-            {/* Canvas for AR overlays */}
-            <canvas
-              ref={canvasRef}
-              className="absolute inset-0 w-full h-96"
-              style={{ pointerEvents: 'none' }}
-            />
-
-            {/* Crosshair */}
-            <div
-              className="absolute w-8 h-8 pointer-events-none z-10"
-              style={{
-                left: gameState.crosshairPosition.x - 16,
-                top: gameState.crosshairPosition.y - 16,
-                transform: 'translate(-50%, -50%)'
-              }}
-            >
-              <div className="w-8 h-8 border-2 border-red-500 rounded-full flex items-center justify-center bg-black/20">
-                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-              </div>
-              {/* Crosshair lines */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-8 h-0.5 bg-red-500"></div>
-              </div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="h-8 w-0.5 bg-red-500"></div>
-              </div>
-            </div>
-
-            {/* Human Detection Boxes */}
-            {humanDetection.map((detection, index) => (
-              <div
-                key={index}
-                className="absolute border-2 border-green-500 bg-green-500/20"
-                style={{
-                  left: detection.x - 25,
-                  top: detection.y - 25,
-                  width: 50,
-                  height: 50
-                }}
-              >
-                <div className="text-green-500 text-xs bg-black/50 px-1">
-                  Human {(detection.confidence * 100).toFixed(0)}%
-                </div>
-              </div>
-            ))}
-
-            {/* Target Indicators for Testing */}
-            {gameState.players.map((player) => (
-              <div
-                key={player.id}
-                className={`absolute w-16 h-16 rounded-full flex items-center justify-center text-white font-bold border-4 ${
-                  player.isAlive
-                    ? player.tim === 'merah' ? 'border-red-500 bg-red-500/50' : 'border-white bg-white/50 text-gray-900'
-                    : 'border-gray-500 bg-gray-500/50'
-                }`}
-                style={{
-                  left: player.position.x - 32,
-                  top: player.position.y - 32
-                }}
-              >
-                {player.id === 'player1' ? 'P1' : 'P2'}
-              </div>
-            ))}
-
-            {/* Controls Overlay */}
-            <div className="absolute bottom-4 left-4 right-4 flex justify-between">
-              <button
-                onClick={handleShoot}
-                disabled={gameState.weaponAmmo <= 0}
-                className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg"
-              >
-                🔫 Shoot ({gameState.weaponAmmo}/{gameState.maxAmmo})
-              </button>
-              
-              <button
-                onClick={reloadWeapon}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
-              >
-                🔄 Reload
-              </button>
-            </div>
-
-            {/* Crosshair Position Info */}
-            <div className="absolute top-4 left-4 bg-black/50 text-white px-3 py-1 rounded-lg text-sm">
-              🎯 Crosshair: Center Screen
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-gray-800 rounded-lg p-4">
+            <h3 className="text-lg font-semibold text-white mb-2">Status Game</h3>
+            <p className="text-gray-300">Status: {gameState.status}</p>
+            <p className="text-gray-300">Waktu: {formatTime(gameState.timeLeft)}</p>
+            <p className="text-gray-300">Pemain: {gameState.players.length}</p>
           </div>
 
-          {/* Camera Controls */}
-          <div className="mt-4 flex space-x-4">
-            <button
-              onClick={enableCamera}
-              className="btn-primary"
-            >
-              📷 Enable Camera
-            </button>
-            
-            <button
-              onClick={enableGPS}
-              className="btn-secondary"
-            >
-              📍 Enable GPS
-            </button>
-          </div>
-        </div>
-
-        {/* GPS and Location Data */}
-        <div className="grid md:grid-cols-2 gap-6 mb-6">
-          <div className="card">
-            <h3 className="text-xl font-bold text-white mb-4">📍 GPS Data</h3>
+          <div className="bg-gray-800 rounded-lg p-4">
+            <h3 className="text-lg font-semibold text-white mb-2">GPS Tracking</h3>
             {gpsData ? (
-              <div className="space-y-2 text-gray-300">
-                <div>Latitude: {gpsData.lat.toFixed(6)}</div>
-                <div>Longitude: {gpsData.lng.toFixed(6)}</div>
-                <div>Accuracy: {gpsData.accuracy.toFixed(1)}m</div>
-                <div>Status: {isGPSEnabled ? '✅ Active' : '❌ Inactive'}</div>
+              <div>
+                <p className="text-gray-300">Lat: {gpsData.lat.toFixed(6)}</p>
+                <p className="text-gray-300">Lng: {gpsData.lng.toFixed(6)}</p>
+                <p className="text-gray-300">Accuracy: {gpsData.accuracy}m</p>
               </div>
             ) : (
-              <div className="text-gray-400">GPS not enabled</div>
+              <p className="text-gray-400">GPS belum aktif</p>
             )}
+            <button 
+              onClick={enableGPS}
+              className="mt-2 bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm"
+            >
+              Enable GPS
+            </button>
           </div>
 
-          <div className="card">
-            <h3 className="text-xl font-bold text-white mb-4">🎯 Target Distance</h3>
-            {gpsData && gameState.players.length > 0 ? (
-              <div className="space-y-2 text-gray-300">
-                {gameState.players
-                  .filter(p => p.id !== gameState.currentPlayer)
-                  .map(player => {
-                    const distance = calculateDistance(
-                      gpsData.lat, gpsData.lng,
-                      player.gps.lat, player.gps.lng
-                    )
-                    return (
-                      <div key={player.id}>
-                        {player.nama}: {distance.toFixed(1)}m
-                      </div>
-                    )
-                  })}
-              </div>
-            ) : (
-              <div className="text-gray-400">No GPS data</div>
-            )}
+          <div className="bg-gray-800 rounded-lg p-4">
+            <h3 className="text-lg font-semibold text-white mb-2">Camera AR</h3>
+            <button 
+              onClick={enableCamera}
+              className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded text-sm"
+            >
+              Enable Camera
+            </button>
           </div>
         </div>
 
         {/* Game Controls */}
-        <div className="grid md:grid-cols-2 gap-6 mb-6">
-          <div className="card">
-            <h3 className="text-xl font-bold text-white mb-4">Game Controls</h3>
-            <div className="space-y-4">
-              {gameState.status === 'waiting' && (
-                <button
-                  onClick={startGame}
-                  className="w-full btn-primary"
-                >
-                  🚀 Mulai AR Battle
-                </button>
-              )}
-
-              {gameState.status === 'playing' && (
-                <div className="space-y-2">
-                  <button
-                    onClick={() => simulateKill('player1', 'player2')}
-                    className="w-full btn-danger"
-                  >
-                    💀 Player 1 Eliminasi Player 2
-                  </button>
-                  <button
-                    onClick={() => simulateKill('player2', 'player1')}
-                    className="w-full btn-danger"
-                  >
-                    💀 Player 2 Eliminasi Player 1
-                  </button>
-                </div>
-              )}
-
-              {gameState.status === 'finished' && (
-                <button
-                  onClick={resetGame}
-                  className="w-full btn-secondary"
-                >
-                  🔄 Reset Game
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="card">
-            <h3 className="text-xl font-bold text-white mb-4">Player Selection</h3>
-            <div className="space-y-2">
-              <button
-                onClick={() => setGameState(prev => ({ ...prev, currentPlayer: 'player1' }))}
-                className={`w-full p-3 rounded-lg transition-colors ${
-                  gameState.currentPlayer === 'player1'
-                    ? 'bg-red-600 text-white'
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
-              >
-                🎮 Player 1 (Merah)
-              </button>
-              <button
-                onClick={() => setGameState(prev => ({ ...prev, currentPlayer: 'player2' }))}
-                className={`w-full p-3 rounded-lg transition-colors ${
-                  gameState.currentPlayer === 'player2'
-                    ? 'bg-white text-gray-900'
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
-              >
-                🎮 Player 2 (Putih)
-              </button>
-            </div>
-          </div>
+        <div className="flex gap-4 mb-8">
+          <button 
+            onClick={startGame}
+            disabled={gameState.status === 'playing'}
+            className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 px-6 py-3 rounded-lg font-semibold"
+          >
+            Start Game
+          </button>
+          <button 
+            onClick={resetGame}
+            className="bg-yellow-600 hover:bg-yellow-700 px-6 py-3 rounded-lg font-semibold"
+          >
+            Reset Game
+          </button>
         </div>
 
-        {/* Player Stats */}
-        <div className="grid md:grid-cols-2 gap-6">
-          {gameState.players.map((player) => (
-            <div key={player.id} className="card">
-              <h3 className="text-xl font-bold text-white mb-4 flex items-center">
-                {player.tim === 'merah' ? '🔴' : '⚪'} {player.nama}
-                {!player.isAlive && <span className="ml-2 text-red-400">💀 ELIMINATED</span>}
-                {player.id === gameState.currentPlayer && <span className="ml-2 text-blue-400">🎯 YOU</span>}
-              </h3>
+        {/* Game Area */}
+        <div className="relative bg-black rounded-lg overflow-hidden" style={{ height: '500px' }}>
+          {/* Video Background */}
+          <video
+            ref={videoRef}
+            className="absolute inset-0 w-full h-full object-cover opacity-50"
+            autoPlay
+            muted
+            playsInline
+          />
+          
+          {/* Canvas Overlay */}
+          <canvas
+            ref={canvasRef}
+            className="absolute inset-0 w-full h-full"
+            style={{ zIndex: 10 }}
+          />
 
-              <div className="space-y-3">
-                {/* Health Bar */}
-                <div>
-                  <div className="flex justify-between text-sm text-gray-300 mb-1">
-                    <span>Health</span>
-                    <span>{player.health}%</span>
-                  </div>
-                  <div className="w-full bg-gray-700 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full transition-all duration-300 ${
-                        player.health > 50 ? 'bg-green-500' : player.health > 25 ? 'bg-yellow-500' : 'bg-red-500'
-                      }`}
-                      style={{ width: `${player.health}%` }}
-                    ></div>
-                  </div>
-                </div>
+          {/* Crosshair */}
+          <div 
+            className="absolute w-8 h-8 border-2 border-red-500 rounded-full pointer-events-none"
+            style={{
+              left: gameState.crosshairPosition.x - 16,
+              top: gameState.crosshairPosition.y - 16,
+              zIndex: 20
+            }}
+          />
 
-                {/* Stats */}
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-400">{player.kills}</div>
-                    <div className="text-gray-400">Kills</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-red-400">{player.deaths}</div>
-                    <div className="text-gray-400">Deaths</div>
-                  </div>
-                </div>
+          {/* Players */}
+          {gameState.players.map(player => (
+            <div
+              key={player.id}
+              className={`absolute w-6 h-6 rounded-full border-2 ${
+                player.tim === 'merah' ? 'bg-red-500 border-red-300' : 'bg-white border-gray-300'
+              } ${!player.isAlive ? 'opacity-50' : ''}`}
+              style={{
+                left: player.position.x,
+                top: player.position.y,
+                zIndex: 15
+              }}
+              title={`${player.nama} - HP: ${player.health}`}
+            />
+          ))}
 
-                {/* GPS Coordinates */}
-                <div className="text-xs text-gray-400">
-                  <div>GPS: {player.gps.lat.toFixed(6)}, {player.gps.lng.toFixed(6)}</div>
-                  <div>Last Seen: {player.lastSeen.toLocaleTimeString()}</div>
-                </div>
+          {/* Human Detection Markers */}
+          {humanDetection.map((detection, index) => (
+            <div
+              key={index}
+              className="absolute w-4 h-4 bg-yellow-400 rounded-full border border-yellow-600"
+              style={{
+                left: detection.x,
+                top: detection.y,
+                zIndex: 25
+              }}
+              title={`Human detected (${(detection.confidence * 100).toFixed(1)}%)`}
+            />
+          ))}
 
-                {/* Status */}
-                <div className="text-center">
-                  <div className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
-                    player.isAlive
-                      ? 'bg-green-500/20 text-green-400 border border-green-500'
-                      : 'bg-red-500/20 text-red-400 border border-red-500'
-                  }`}>
-                    {player.isAlive ? '🟢 ALIVE' : '🔴 ELIMINATED'}
-                  </div>
+          {/* Shoot Button */}
+          <button
+            onClick={handleShoot}
+            disabled={gameState.weaponAmmo === 0}
+            className="absolute bottom-4 right-4 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 w-16 h-16 rounded-full text-white font-bold text-xl"
+            style={{ zIndex: 30 }}
+          >
+            🔫
+          </button>
+        </div>
+
+        {/* Player List */}
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-gray-800 rounded-lg p-4">
+            <h3 className="text-lg font-semibold text-white mb-4">Tim Merah</h3>
+            {gameState.players.filter(p => p.tim === 'merah').map(player => (
+              <div key={player.id} className="flex justify-between items-center mb-2 p-2 bg-red-900 rounded">
+                <span className="text-white">{player.nama}</span>
+                <div className="text-sm text-gray-300">
+                  <span className="mr-2">HP: {player.health}</span>
+                  <span className="mr-2">Kills: {player.kills}</span>
+                  <span>Deaths: {player.deaths}</span>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
 
-        {/* AR Game Info */}
-        <div className="card mt-6">
-          <h3 className="text-xl font-bold text-white mb-4">📋 AR Game Features</h3>
-          <div className="grid md:grid-cols-3 gap-4 text-gray-300">
-            <div>
-              <h4 className="font-bold text-white mb-2">🎯 Crosshair Targeting</h4>
-              <p className="text-sm">Real-time crosshair untuk targeting lawan</p>
-            </div>
-            <div>
-              <h4 className="font-bold text-white mb-2">📍 GPS Tracking</h4>
-              <p className="text-sm">GPS coordinates untuk positioning</p>
-            </div>
-            <div>
-              <h4 className="font-bold text-white mb-2">👤 Human Detection</h4>
-              <p className="text-sm">AI detection untuk identify targets</p>
-            </div>
+          <div className="bg-gray-800 rounded-lg p-4">
+            <h3 className="text-lg font-semibold text-white mb-4">Tim Putih</h3>
+            {gameState.players.filter(p => p.tim === 'putih').map(player => (
+              <div key={player.id} className="flex justify-between items-center mb-2 p-2 bg-gray-700 rounded">
+                <span className="text-white">{player.nama}</span>
+                <div className="text-sm text-gray-300">
+                  <span className="mr-2">HP: {player.health}</span>
+                  <span className="mr-2">Kills: {player.kills}</span>
+                  <span>Deaths: {player.deaths}</span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
