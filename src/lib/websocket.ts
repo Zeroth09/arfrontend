@@ -226,7 +226,7 @@ export class MultiplayerWebSocket {
   }
 
   // Public method to emit events directly
-  emit(event: string, data: any): void {
+  emit(event: string, data: Record<string, unknown>): void {
     if (this.socket && this.socket.connected) {
       this.socket.emit(event, data)
     } else {

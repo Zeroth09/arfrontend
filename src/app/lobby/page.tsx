@@ -117,7 +117,7 @@ export default function LobbyPage() {
         multiplayer.disconnect()
       }
     }
-  }, [])
+  }, [multiplayer])
 
   // Handle incoming messages
   const handlePlayerJoin = (message: LobbyMessage) => {
