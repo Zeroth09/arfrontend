@@ -129,8 +129,8 @@ export default function LobbyPage() {
                     </div>
                     <span className="text-white font-semibold">{player.nama}</span>
                   </div>
-                  <div className="text-gray-400 text-sm">
-                    {player.joinedAt.toLocaleTimeString()}
+                  <div className="text-sm text-gray-400">
+                    Joined: {player.joinedAt ? player.joinedAt.toLocaleTimeString() : 'N/A'}
                   </div>
                 </div>
               ))}
@@ -156,8 +156,8 @@ export default function LobbyPage() {
                     </div>
                     <span className="text-white font-semibold">{player.nama}</span>
                   </div>
-                  <div className="text-gray-400 text-sm">
-                    {player.joinedAt.toLocaleTimeString()}
+                  <div className="text-sm text-gray-400">
+                    Joined: {player.joinedAt ? player.joinedAt.toLocaleTimeString() : 'N/A'}
                   </div>
                 </div>
               ))}

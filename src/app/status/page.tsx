@@ -167,7 +167,7 @@ export default function StatusPage() {
           </div>
           
           <div className="mt-6 text-center text-gray-400 text-sm">
-            Last updated: {serverStatus.lastUpdate.toLocaleTimeString()}
+            Last updated: {serverStatus.lastUpdate ? serverStatus.lastUpdate.toLocaleTimeString() : 'N/A'}
           </div>
         </div>
 
@@ -191,9 +191,9 @@ export default function StatusPage() {
                   <div className="text-gray-400 text-sm">
                     {endpoint.responseTime}ms
                   </div>
-                  <div className="text-gray-500 text-xs">
-                    {endpoint.lastCheck.toLocaleTimeString()}
-                  </div>
+                  <div className="text-xs text-gray-400">
+                  {endpoint.lastCheck ? endpoint.lastCheck.toLocaleTimeString() : 'N/A'}
+                </div>
                 </div>
               </div>
             ))}

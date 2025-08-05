@@ -735,7 +735,7 @@ export default function DemoPage() {
               <div>Latitude: {gpsData.lat.toFixed(6)}</div>
               <div>Longitude: {gpsData.lng.toFixed(6)}</div>
               <div>Accuracy: {gpsData.accuracy.toFixed(1)}m</div>
-              <div>Timestamp: {new Date(gpsData.timestamp).toLocaleTimeString()}</div>
+              <div>Timestamp: {gpsData.timestamp ? new Date(gpsData.timestamp).toLocaleTimeString() : 'N/A'}</div>
             </div>
           </div>
         )}

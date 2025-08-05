@@ -215,8 +215,8 @@ export default function GameMasterPage() {
                     <div className="text-sm text-gray-400">
                       Kills: {player.kills} | Deaths: {player.deaths}
                     </div>
-                    <div className="text-xs text-gray-500">
-                      {player.lastSeen.toLocaleTimeString()}
+                    <div className="text-xs text-gray-400">
+                      Last seen: {player.lastSeen ? player.lastSeen.toLocaleTimeString() : 'N/A'}
                     </div>
                   </div>
                 </div>
@@ -255,8 +255,8 @@ export default function GameMasterPage() {
                     <div className="text-sm text-gray-400">
                       Kills: {player.kills} | Deaths: {player.deaths}
                     </div>
-                    <div className="text-xs text-gray-500">
-                      {player.lastSeen.toLocaleTimeString()}
+                    <div className="text-xs text-gray-400">
+                      Last seen: {player.lastSeen ? player.lastSeen.toLocaleTimeString() : 'N/A'}
                     </div>
                   </div>
                 </div>
