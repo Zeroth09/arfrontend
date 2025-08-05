@@ -89,7 +89,7 @@ export interface Achievement {
 // API types
 export interface ApiResponse<T> {
   success: boolean
-  data?: T
+  data: T | null
   message?: string
   error?: string
 }

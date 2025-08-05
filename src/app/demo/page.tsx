@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { DemoMultiplayer, GameMessage, PlayerData } from '@/lib/websocket'
+import { DemoMultiplayer, PlayerData } from '@/lib/websocket'
 
 interface Player {
   id: string
@@ -55,7 +55,7 @@ export default function DemoPage() {
   // Calculate center position for crosshair
   const [screenCenter, setScreenCenter] = useState({ x: 0, y: 0 })
 
-  const [cameraView, setCameraView] = useState<'overview' | 'player1' | 'player2'>('overview')
+  const [cameraView] = useState<'overview' | 'player1' | 'player2'>('overview')
   const [gpsData, setGpsData] = useState<GPSData | null>(null)
   const [isGPSEnabled, setIsGPSEnabled] = useState(false)
   const [humanDetection, setHumanDetection] = useState<{ x: number; y: number; confidence: number }[]>([])
@@ -75,7 +75,7 @@ export default function DemoPage() {
     // Set up event handlers
     demoMultiplayer.on('player_join', (data) => {
       console.log('Player joined:', data)
-      setOtherPlayers(prev => [...prev, data.player])
+      setOtherPlayers(prev => [...prev, data.player as Player])
     })
 
     demoMultiplayer.on('position_update', (data) => {
@@ -84,7 +84,12 @@ export default function DemoPage() {
         ...prev,
         players: prev.players.map(p => 
           p.id === data.playerId 
-            ? { ...p, position: data.position, gps: data.gps, lastSeen: new Date() }
+            ? { 
+                ...p, 
+                position: data.position as { x: number; y: number }, 
+                gps: data.gps as { lat: number; lng: number }, 
+                lastSeen: new Date() 
+              }
             : p
         )
       }))
@@ -96,7 +101,7 @@ export default function DemoPage() {
         ...prev,
         players: prev.players.map(p => {
           if (p.id === data.targetId) {
-            return { ...p, health: Math.max(0, p.health - data.damage) }
+            return { ...p, health: Math.max(0, p.health - (data.damage as number)) }
           }
           if (p.id === data.shooterId) {
             return { ...p, kills: p.kills + 1 }
@@ -302,11 +307,10 @@ export default function DemoPage() {
         multiplayer.sendMessage({
           type: 'shoot',
           playerId: gameState.currentPlayer!,
-          data: { 
-            targetId: targetPlayer.id, 
-            crosshairPosition: { x: centerX, y: centerY },
-            timestamp: Date.now()
-          },
+                  data: { 
+          crosshairPosition: { x: centerX, y: centerY },
+          timestamp: Date.now()
+        },
           timestamp: Date.now()
         })
         

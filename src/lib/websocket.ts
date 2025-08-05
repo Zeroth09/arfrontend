@@ -1,7 +1,7 @@
 export interface GameMessage {
   type: 'player_join' | 'player_leave' | 'position_update' | 'shoot' | 'hit' | 'elimination' | 'game_state'
   playerId: string
-  data: any
+  data: Record<string, unknown>
   timestamp: number
 }
 
@@ -23,7 +23,7 @@ export class MultiplayerWebSocket {
   private reconnectAttempts = 0
   private maxReconnectAttempts = 5
   private reconnectDelay = 1000
-  private messageHandlers: Map<string, (data: any) => void> = new Map()
+  private messageHandlers: Map<string, (data: Record<string, unknown>) => void> = new Map()
 
   constructor(
     private serverUrl: string,
@@ -144,7 +144,7 @@ export class MultiplayerWebSocket {
   }
 
   // Add message handler
-  on(event: string, handler: (data: any) => void): void {
+  on(event: string, handler: (data: Record<string, unknown>) => void): void {
     this.messageHandlers.set(event, handler)
   }
 
@@ -157,7 +157,7 @@ export class MultiplayerWebSocket {
 // Fallback multiplayer simulation for demo
 export class DemoMultiplayer {
   private players: Map<string, PlayerData> = new Map()
-  private messageHandlers: Map<string, (data: any) => void> = new Map()
+  private messageHandlers: Map<string, (data: Record<string, unknown>) => void> = new Map()
   private interval: NodeJS.Timeout | null = null
 
   constructor(private playerId: string) {
@@ -269,7 +269,7 @@ export class DemoMultiplayer {
   }
 
   private handleShoot(message: GameMessage): void {
-    const { targetId, crosshairPosition } = message.data
+    const { targetId, crosshairPosition } = message.data as { targetId: string; crosshairPosition: { x: number; y: number } }
     
     // Simulate hit detection
     const target = this.players.get(targetId)
@@ -294,7 +294,7 @@ export class DemoMultiplayer {
   }
 
   private handlePositionUpdate(message: GameMessage): void {
-    const { position, gps } = message.data
+    const { position, gps } = message.data as { position: { x: number; y: number }; gps: { lat: number; lng: number } }
     const player = this.players.get(message.playerId)
     if (player) {
       player.position = position
@@ -304,21 +304,21 @@ export class DemoMultiplayer {
   }
 
   private handleHit(message: GameMessage): void {
-    const { targetId, damage } = message.data
+    const { targetId } = message.data as { targetId: string; damage: number }
     const player = this.players.get(message.playerId)
     if (player) {
       player.kills += 1
     }
   }
 
-  private emit(event: string, data: any): void {
+  private emit(event: string, data: Record<string, unknown>): void {
     const handler = this.messageHandlers.get(event)
     if (handler) {
       handler(data)
     }
   }
 
-  on(event: string, handler: (data: any) => void): void {
+  on(event: string, handler: (data: Record<string, unknown>) => void): void {
     this.messageHandlers.set(event, handler)
   }
 

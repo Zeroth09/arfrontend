@@ -65,27 +65,6 @@ export const testAPIConnection = async (): Promise<{ success: boolean; message: 
         response: errorData
       }
     }
-
-    console.log('API Response status:', response.status)
-    console.log('API Response headers:', response.headers)
-
-    if (response.ok) {
-      const data = await response.json()
-      console.log('API Response data:', data)
-      return {
-        success: true,
-        message: 'API berhasil terkoneksi!',
-        response: data
-      }
-    } else {
-      const errorData = await response.text()
-      console.log('API Error response:', errorData)
-      return {
-        success: false,
-        message: `API Error: ${response.status} - ${errorData}`,
-        response: errorData
-      }
-    }
   } catch (error) {
     console.error('API Connection Error:', error)
     return {
@@ -101,35 +80,40 @@ async function apiCall<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> {
-  try {
-    const token = localStorage.getItem('auth_token')
-    
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
-      },
-      ...options,
-    })
+  const token = localStorage.getItem('auth_token')
+  
+  const config: RequestInit = {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...options.headers,
+    },
+    ...options,
+  }
 
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, config)
     const data = await response.json()
 
-    if (!response.ok) {
-      throw new Error(data.message || 'Terjadi kesalahan pada server')
+    if (response.ok) {
+      return { success: true, data }
+    } else {
+      return { 
+        success: false, 
+        error: data.message || `HTTP ${response.status}`,
+        data: null
+      }
     }
-
-    return data
   } catch (error) {
-    console.error('API Error:', error)
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Terjadi kesalahan pada network'
+      error: error instanceof Error ? error.message : 'Network error',
+      data: null
     }
   }
 }
 
-// Auth API functions
+// Auth API
 export const authAPI = {
   login: async (credentials: LoginRequest): Promise<ApiResponse<AuthResponse>> => {
     return apiCall<AuthResponse>('/auth/login', {
@@ -145,8 +129,8 @@ export const authAPI = {
     })
   },
 
-  logout: async (): Promise<ApiResponse<void>> => {
-    return apiCall<void>('/auth/logout', {
+  logout: async (): Promise<ApiResponse<Record<string, unknown>>> => {
+    return apiCall<Record<string, unknown>>('/auth/logout', {
       method: 'POST',
     })
   },
@@ -156,19 +140,33 @@ export const authAPI = {
       method: 'POST',
     })
   },
+}
 
+// User API
+export const userAPI = {
   getProfile: async (): Promise<ApiResponse<User>> => {
-    return apiCall<User>('/auth/profile')
+    return apiCall<User>('/user/profile')
+  },
+
+  updateProfile: async (userData: Partial<User>): Promise<ApiResponse<User>> => {
+    return apiCall<User>('/user/profile', {
+      method: 'PUT',
+      body: JSON.stringify(userData),
+    })
+  },
+
+  getStats: async (): Promise<ApiResponse<UserStats>> => {
+    return apiCall<UserStats>('/user/stats')
   },
 }
 
-// Game API functions
+// Game API
 export const gameAPI = {
   getRooms: async (): Promise<ApiResponse<GameRoom[]>> => {
     return apiCall<GameRoom[]>('/game/rooms')
   },
 
-  createRoom: async (roomData: Partial<GameRoom>): Promise<ApiResponse<GameRoom>> => {
+  createRoom: async (roomData: { nama: string; maxPlayers: number; gameMode: string }): Promise<ApiResponse<GameRoom>> => {
     return apiCall<GameRoom>('/game/rooms', {
       method: 'POST',
       body: JSON.stringify(roomData),
@@ -181,54 +179,37 @@ export const gameAPI = {
     })
   },
 
-  leaveRoom: async (roomId: string): Promise<ApiResponse<void>> => {
-    return apiCall<void>(`/game/rooms/${roomId}/leave`, {
+  leaveRoom: async (roomId: string): Promise<ApiResponse<Record<string, unknown>>> => {
+    return apiCall<Record<string, unknown>>(`/game/rooms/${roomId}/leave`, {
       method: 'POST',
     })
   },
 
-  getGameState: async (roomId: string): Promise<ApiResponse<unknown>> => {
-    return apiCall<unknown>(`/game/rooms/${roomId}/state`)
+  getRoomStatus: async (roomId: string): Promise<ApiResponse<GameRoom>> => {
+    return apiCall<GameRoom>(`/game/rooms/${roomId}`)
   },
 
-  updatePlayerPosition: async (
-    roomId: string,
-    position: { x: number; y: number; z?: number }
-  ): Promise<ApiResponse<void>> => {
-    return apiCall<void>(`/game/rooms/${roomId}/position`, {
-      method: 'PUT',
-      body: JSON.stringify(position),
+  startGame: async (roomId: string): Promise<ApiResponse<Record<string, unknown>>> => {
+    return apiCall<Record<string, unknown>>(`/game/rooms/${roomId}/start`, {
+      method: 'POST',
     })
   },
 
-  shoot: async (
-    roomId: string,
-    targetId: string,
-    weaponId: string
-  ): Promise<ApiResponse<{ hit: boolean; damage: number }>> => {
-    return apiCall<{ hit: boolean; damage: number }>(`/game/rooms/${roomId}/shoot`, {
+  endGame: async (roomId: string): Promise<ApiResponse<Record<string, unknown>>> => {
+    return apiCall<Record<string, unknown>>(`/game/rooms/${roomId}/end`, {
       method: 'POST',
-      body: JSON.stringify({ targetId, weaponId }),
     })
   },
 }
 
-// Stats API functions
+// Stats API
 export const statsAPI = {
-  getUserStats: async (): Promise<ApiResponse<UserStats>> => {
-    return apiCall<UserStats>('/stats/user')
+  getLeaderboard: async (): Promise<ApiResponse<UserStats[]>> => {
+    return apiCall<UserStats[]>('/stats/leaderboard')
   },
 
-  getLeaderboard: async (): Promise<ApiResponse<unknown[]>> => {
-    return apiCall<unknown[]>('/stats/leaderboard')
-  },
-
-  getAchievements: async (): Promise<ApiResponse<unknown[]>> => {
-    return apiCall<unknown[]>('/stats/achievements')
-  },
-
-  getGameHistory: async (page = 1, limit = 10): Promise<ApiResponse<unknown>> => {
-    return apiCall<unknown>(`/stats/history?page=${page}&limit=${limit}`)
+  getGameHistory: async (page = 1, limit = 10): Promise<ApiResponse<Record<string, unknown>>> => {
+    return apiCall<Record<string, unknown>>(`/stats/history?page=${page}&limit=${limit}`)
   },
 }
 
@@ -237,22 +218,15 @@ export const apiUtils = {
   // Check if user is authenticated
   isAuthenticated: (): boolean => {
     const token = localStorage.getItem('auth_token')
-    if (!token) return false
-    
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]))
-      return payload.exp * 1000 > Date.now()
-    } catch {
-      return false
-    }
+    return !!token
   },
 
   // Get user from token
   getUserFromToken: (): User | null => {
-    const token = localStorage.getItem('auth_token')
-    if (!token) return null
-    
     try {
+      const token = localStorage.getItem('auth_token')
+      if (!token) return null
+      
       const payload = JSON.parse(atob(token.split('.')[1]))
       return payload.user || null
     } catch {
@@ -292,7 +266,7 @@ export class GameWebSocket {
   private maxReconnectAttempts = 5
   private reconnectDelay = 1000
 
-  constructor(private roomId: string, private onMessage: (data: unknown) => void) {}
+  constructor(private roomId: string, private onMessage: (data: Record<string, unknown>) => void) {}
 
   connect(): void {
     const token = localStorage.getItem('auth_token')
@@ -310,7 +284,7 @@ export class GameWebSocket {
 
     this.ws.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data)
+        const data = JSON.parse(event.data) as Record<string, unknown>
         this.onMessage(data)
       } catch (error) {
         console.error('Error parsing WebSocket message:', error)
@@ -340,7 +314,7 @@ export class GameWebSocket {
     }
   }
 
-  send(data: unknown): void {
+  send(data: Record<string, unknown>): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(data))
     }
