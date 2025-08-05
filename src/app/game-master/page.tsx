@@ -36,23 +36,10 @@ export default function GameMasterPage() {
   const [showCameraView, setShowCameraView] = useState(false)
 
   useEffect(() => {
-    // Simulate players joining
-    const mockPlayers: Player[] = [
-      { id: '1', nama: 'Player1', tim: 'merah', health: 100, ammo: 30, position: { x: 50, y: 50 }, isAlive: true, kills: 0, deaths: 0, lastSeen: new Date() },
-      { id: '2', nama: 'Player2', tim: 'merah', health: 100, ammo: 30, position: { x: 100, y: 50 }, isAlive: true, kills: 0, deaths: 0, lastSeen: new Date() },
-      { id: '3', nama: 'Player3', tim: 'merah', health: 100, ammo: 30, position: { x: 150, y: 50 }, isAlive: true, kills: 0, deaths: 0, lastSeen: new Date() },
-      { id: '4', nama: 'Player4', tim: 'merah', health: 100, ammo: 30, position: { x: 200, y: 50 }, isAlive: true, kills: 0, deaths: 0, lastSeen: new Date() },
-      { id: '5', nama: 'Player5', tim: 'merah', health: 100, ammo: 30, position: { x: 250, y: 50 }, isAlive: true, kills: 0, deaths: 0, lastSeen: new Date() },
-      { id: '6', nama: 'Player6', tim: 'putih', health: 100, ammo: 30, position: { x: 50, y: 200 }, isAlive: true, kills: 0, deaths: 0, lastSeen: new Date() },
-      { id: '7', nama: 'Player7', tim: 'putih', health: 100, ammo: 30, position: { x: 100, y: 200 }, isAlive: true, kills: 0, deaths: 0, lastSeen: new Date() },
-      { id: '8', nama: 'Player8', tim: 'putih', health: 100, ammo: 30, position: { x: 150, y: 200 }, isAlive: true, kills: 0, deaths: 0, lastSeen: new Date() },
-      { id: '9', nama: 'Player9', tim: 'putih', health: 100, ammo: 30, position: { x: 200, y: 200 }, isAlive: true, kills: 0, deaths: 0, lastSeen: new Date() },
-      { id: '10', nama: 'Player10', tim: 'putih', health: 100, ammo: 30, position: { x: 250, y: 200 }, isAlive: true, kills: 0, deaths: 0, lastSeen: new Date() }
-    ]
-
+    // Initialize empty players list - will be populated by real WebSocket connections
     setGameState(prev => ({
       ...prev,
-      players: mockPlayers
+      players: []
     }))
   }, [])
 

@@ -25,20 +25,11 @@ export default function LobbyPage() {
     gameMaster: false
   })
 
+  // Initialize current player
   useEffect(() => {
-    // Get player data from localStorage
-    const stored = localStorage.getItem('playerData')
-    if (stored) {
-      const data = JSON.parse(stored)
-      
-      // Add current player to players list
-      const currentPlayer: Player = {
-        id: Math.random().toString(36).substr(2, 9),
-        nama: data.nama,
-        tim: data.tim,
-        joinedAt: new Date()
-      }
-      
+    const playerData = localStorage.getItem('playerData')
+    if (playerData) {
+      const currentPlayer: Player = JSON.parse(playerData)
       setGameState(prev => ({
         ...prev,
         players: [currentPlayer]
@@ -46,34 +37,10 @@ export default function LobbyPage() {
     }
   }, [])
 
-  // Simulate other players joining
-  useEffect(() => {
-    const mockPlayers: Player[] = [
-      { id: '1', nama: 'Player1', tim: 'merah', joinedAt: new Date() },
-      { id: '2', nama: 'Player2', tim: 'merah', joinedAt: new Date() },
-      { id: '3', nama: 'Player3', tim: 'merah', joinedAt: new Date() },
-      { id: '4', nama: 'Player4', tim: 'merah', joinedAt: new Date() },
-      { id: '5', nama: 'Player5', tim: 'putih', joinedAt: new Date() },
-      { id: '6', nama: 'Player6', tim: 'putih', joinedAt: new Date() },
-      { id: '7', nama: 'Player7', tim: 'putih', joinedAt: new Date() },
-      { id: '8', nama: 'Player8', tim: 'putih', joinedAt: new Date() },
-      { id: '9', nama: 'Player9', tim: 'putih', joinedAt: new Date() }
-    ]
-
-    const timer = setTimeout(() => {
-      setGameState(prev => ({
-        ...prev,
-        players: [...prev.players, ...mockPlayers.slice(0, 4)] // Add 4 more players
-      }))
-    }, 2000)
-
-    return () => clearTimeout(timer)
-  }, [])
-
   const merahPlayers = gameState.players.filter(p => p.tim === 'merah')
   const putihPlayers = gameState.players.filter(p => p.tim === 'putih')
 
-  const canStartGame = merahPlayers.length >= 5 && putihPlayers.length >= 5
+  const canStartGame = merahPlayers.length >= 1 && putihPlayers.length >= 1
 
   const handleStartGame = () => {
     setGameState(prev => ({
