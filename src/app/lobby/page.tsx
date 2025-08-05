@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { MultiplayerWebSocket, GameMessage } from '@/lib/websocket'
 
 interface Player {
   id: string
@@ -17,6 +18,15 @@ interface GameState {
   gameMaster: boolean
 }
 
+interface LobbyMessage extends GameMessage {
+  data: {
+    player?: Player
+    timestamp?: number
+    status?: string
+    timeLeft?: number
+  }
+}
+
 export default function LobbyPage() {
   const [gameState, setGameState] = useState<GameState>({
     status: 'waiting',
@@ -24,8 +34,11 @@ export default function LobbyPage() {
     players: [],
     gameMaster: false
   })
+  const [isConnected, setIsConnected] = useState(false)
+  const [multiplayer, setMultiplayer] = useState<MultiplayerWebSocket | null>(null)
+  const currentPlayerRef = useRef<Player | null>(null)
 
-  // Initialize current player
+  // Initialize current player and WebSocket connection
   useEffect(() => {
     const playerData = localStorage.getItem('playerData')
     if (playerData) {
@@ -40,10 +53,49 @@ export default function LobbyPage() {
           joinedAt: rawData.joinedAt ? new Date(rawData.joinedAt) : new Date()
         }
         
+        currentPlayerRef.current = currentPlayer
+        
+        // Initialize WebSocket connection
+        const serverUrl = 'https://shaky-meeting-production.up.railway.app'
+        const ws = new MultiplayerWebSocket(serverUrl, currentPlayer.id, (message) => {
+          console.log('Received lobby message:', message)
+          
+          switch (message.type) {
+            case 'player_join':
+              handlePlayerJoin(message)
+              break
+            case 'player_leave':
+              handlePlayerLeave(message)
+              break
+            case 'game_state':
+              handleGameStateUpdate(message)
+              break
+          }
+        })
+        
+        setMultiplayer(ws)
+        ws.connect()
+        setIsConnected(true)
+        
+        // Send player join message
+        setTimeout(() => {
+          ws.sendMessage({
+            type: 'player_join',
+            playerId: currentPlayer.id,
+            data: {
+              player: currentPlayer,
+              timestamp: Date.now()
+            },
+            timestamp: Date.now()
+          })
+        }, 1000)
+        
+        // Add current player to local state
         setGameState(prev => ({
           ...prev,
           players: [currentPlayer]
         }))
+        
       } catch (error) {
         console.error('Error parsing player data:', error)
         // Fallback player data
@@ -53,13 +105,54 @@ export default function LobbyPage() {
           tim: 'merah',
           joinedAt: new Date()
         }
+        currentPlayerRef.current = fallbackPlayer
         setGameState(prev => ({
           ...prev,
           players: [fallbackPlayer]
         }))
       }
     }
+    
+    return () => {
+      if (multiplayer) {
+        multiplayer.disconnect()
+      }
+    }
   }, [])
+
+  // Handle player join
+  const handlePlayerJoin = (message: LobbyMessage) => {
+    const newPlayer = message.data.player
+    if (newPlayer && newPlayer.id !== currentPlayerRef.current?.id) {
+      setGameState(prev => ({
+        ...prev,
+        players: [...prev.players, newPlayer]
+      }))
+      console.log('Player joined:', newPlayer.nama)
+    }
+  }
+
+  // Handle player leave
+  const handlePlayerLeave = (message: LobbyMessage) => {
+    const playerId = message.playerId
+    setGameState(prev => ({
+      ...prev,
+      players: prev.players.filter(p => p.id !== playerId)
+    }))
+    console.log('Player left:', playerId)
+  }
+
+  // Handle game state update
+  const handleGameStateUpdate = (message: LobbyMessage) => {
+    const gameData = message.data
+    if (gameData) {
+      setGameState(prev => ({
+        ...prev,
+        status: (gameData.status as 'waiting' | 'starting' | 'playing' | 'finished') || prev.status,
+        timeLeft: gameData.timeLeft || prev.timeLeft
+      }))
+    }
+  }
 
   const merahPlayers = gameState.players.filter(p => p.tim === 'merah')
   const putihPlayers = gameState.players.filter(p => p.tim === 'putih')
@@ -72,6 +165,20 @@ export default function LobbyPage() {
       status: 'starting'
     }))
     
+    // Send game start message to all players
+    if (multiplayer) {
+      multiplayer.sendMessage({
+        type: 'game_state',
+        playerId: currentPlayerRef.current?.id || '',
+        data: {
+          status: 'starting',
+          timeLeft: 300,
+          timestamp: Date.now()
+        },
+        timestamp: Date.now()
+      })
+    }
+    
     // Simulate game starting
     setTimeout(() => {
       window.location.href = '/game'
@@ -79,6 +186,19 @@ export default function LobbyPage() {
   }
 
   const handleLeaveLobby = () => {
+    // Send leave message to server
+    if (multiplayer && currentPlayerRef.current) {
+      multiplayer.sendMessage({
+        type: 'player_leave',
+        playerId: currentPlayerRef.current.id,
+        data: {
+          player: currentPlayerRef.current,
+          timestamp: Date.now()
+        },
+        timestamp: Date.now()
+      })
+    }
+    
     localStorage.removeItem('playerData')
     window.location.href = '/'
   }
@@ -109,6 +229,21 @@ export default function LobbyPage() {
               {gameState.status === 'playing' && 'Game Sedang Berlangsung'}
               {gameState.status === 'finished' && 'Game Selesai'}
             </h2>
+            
+            {/* Multiplayer Status */}
+            <div className="mb-4">
+              <div className={`inline-flex items-center space-x-2 px-4 py-2 rounded-lg ${
+                isConnected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+              }`}>
+                <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                <span className="font-semibold">
+                  {isConnected ? '🟢 Multiplayer Connected' : '🔴 Multiplayer Disconnected'}
+                </span>
+              </div>
+              <div className="text-sm text-gray-400 mt-2">
+                Players Online: {gameState.players.length}
+              </div>
+            </div>
             
             {gameState.status === 'starting' && (
               <div className="text-3xl font-bold text-yellow-400 animate-pulse">
