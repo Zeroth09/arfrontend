@@ -51,6 +51,9 @@ export default function DemoPage() {
     maxAmmo: 30
   })
 
+  // Calculate center position for crosshair
+  const [screenCenter, setScreenCenter] = useState({ x: 0, y: 0 })
+
   const [cameraView, setCameraView] = useState<'overview' | 'player1' | 'player2'>('overview')
   const [gpsData, setGpsData] = useState<GPSData | null>(null)
   const [isGPSEnabled, setIsGPSEnabled] = useState(false)
@@ -167,7 +170,7 @@ export default function DemoPage() {
     }
   }
 
-  // Simulate human detection
+  // Simulate human detection and target movement
   const startHumanDetection = () => {
     setInterval(() => {
       // Simulate human detection with random positions
@@ -177,17 +180,32 @@ export default function DemoPage() {
       ]
       setHumanDetection(detections)
     }, 1000)
+
+    // Simulate target movement (camera movement effect)
+    setInterval(() => {
+      setGameState(prev => ({
+        ...prev,
+        players: prev.players.map(player => ({
+          ...player,
+          position: {
+            x: Math.random() * 600 + 50, // Random position within screen bounds
+            y: Math.random() * 300 + 50
+          }
+        }))
+      }))
+    }, 3000) // Move targets every 3 seconds
   }
 
-  // Handle crosshair movement
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
+  // Calculate screen center for crosshair
+  const calculateScreenCenter = (element: HTMLDivElement) => {
+    const rect = element.getBoundingClientRect()
+    const centerX = rect.width / 2
+    const centerY = rect.height / 2
     
+    setScreenCenter({ x: centerX, y: centerY })
     setGameState(prev => ({
       ...prev,
-      crosshairPosition: { x, y }
+      crosshairPosition: { x: centerX, y: centerY }
     }))
   }
 
@@ -203,21 +221,21 @@ export default function DemoPage() {
       weaponAmmo: prev.weaponAmmo - 1
     }))
 
-    // Check if crosshair is on target
+    // Check if any target is in crosshair (center screen)
     const targetPlayer = gameState.players.find(p => p.id !== gameState.currentPlayer && p.isAlive)
     if (targetPlayer) {
-      // Calculate distance from crosshair to target
+      // Calculate distance from screen center to target
       const targetX = targetPlayer.position.x
       const targetY = targetPlayer.position.y
-      const crosshairX = gameState.crosshairPosition.x
-      const crosshairY = gameState.crosshairPosition.y
+      const centerX = screenCenter.x
+      const centerY = screenCenter.y
       
       const distance = Math.sqrt(
-        Math.pow(crosshairX - targetX, 2) + Math.pow(crosshairY - targetY, 2)
+        Math.pow(centerX - targetX, 2) + Math.pow(centerY - targetY, 2)
       )
       
-      // Hit if crosshair is within 50px of target
-      if (distance < 50) {
+      // Hit if target is within 100px of screen center (more realistic for AR)
+      if (distance < 100) {
         simulateKill(gameState.currentPlayer!, targetPlayer.id)
         console.log('Target hit! Distance:', distance.toFixed(1), 'px')
       } else {
@@ -426,17 +444,12 @@ export default function DemoPage() {
           <h3 className="text-xl font-bold text-white mb-4">📱 AR Camera View</h3>
           
           <div 
-            className="relative bg-black rounded-lg overflow-hidden cursor-none"
-            onMouseMove={handleMouseMove}
-            onMouseEnter={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect()
-              const x = e.clientX - rect.left
-              const y = e.clientY - rect.top
-              setGameState(prev => ({
-                ...prev,
-                crosshairPosition: { x, y }
-              }))
+            ref={(element) => {
+              if (element) {
+                calculateScreenCenter(element)
+              }
             }}
+            className="relative bg-black rounded-lg overflow-hidden"
           >
             {/* Camera Feed */}
             <video
@@ -531,7 +544,7 @@ export default function DemoPage() {
 
             {/* Crosshair Position Info */}
             <div className="absolute top-4 left-4 bg-black/50 text-white px-3 py-1 rounded-lg text-sm">
-              Crosshair: ({gameState.crosshairPosition.x.toFixed(0)}, {gameState.crosshairPosition.y.toFixed(0)})
+              🎯 Crosshair: Center Screen
             </div>
           </div>
 
