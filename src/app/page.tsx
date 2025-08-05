@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { testAPIConnection } from '@/lib/api'
 
 interface PlayerData {
   nama: string
@@ -14,6 +15,25 @@ export default function HomePage() {
     tim: null
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [apiStatus, setApiStatus] = useState<{ success: boolean; message: string } | null>(null)
+  const [isTestingAPI, setIsTestingAPI] = useState(false)
+
+  const testAPI = async () => {
+    setIsTestingAPI(true)
+    setApiStatus(null)
+    
+    try {
+      const result = await testAPIConnection()
+      setApiStatus(result)
+    } catch (error) {
+      setApiStatus({
+        success: false,
+        message: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+      })
+    } finally {
+      setIsTestingAPI(false)
+    }
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -89,13 +109,48 @@ export default function HomePage() {
 
           {/* Status server */}
           <div className="card max-w-md mx-auto mb-8">
-            <div className="flex items-center justify-center space-x-2">
+            <div className="flex items-center justify-center space-x-2 mb-4">
               <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
               <span className="text-green-400 font-semibold">Server Online</span>
             </div>
-            <p className="text-gray-400 text-sm mt-2">
+            <p className="text-gray-400 text-sm mb-4">
               https://backend-production-9ccf.up.railway.app/
             </p>
+            
+            {/* API Test Button */}
+            <button
+              onClick={testAPI}
+              disabled={isTestingAPI}
+              className="w-full btn-secondary py-2 text-sm disabled:opacity-50"
+            >
+              {isTestingAPI ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Testing API...
+                </>
+              ) : (
+                '🔧 Test API Connection'
+              )}
+            </button>
+
+            {/* API Status */}
+            {apiStatus && (
+              <div className={`mt-4 p-3 rounded-lg text-sm ${
+                apiStatus.success 
+                  ? 'bg-green-500/20 border border-green-500 text-green-400' 
+                  : 'bg-red-500/20 border border-red-500 text-red-400'
+              }`}>
+                <div className="font-bold mb-1">
+                  {apiStatus.success ? '✅ API Connected' : '❌ API Error'}
+                </div>
+                <div className="text-xs">
+                  {apiStatus.message}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Player Registration Form */}

@@ -2,6 +2,100 @@ import { ApiResponse, LoginRequest, RegisterRequest, AuthResponse, GameRoom, Use
 
 const API_BASE_URL = 'https://backend-production-9ccf.up.railway.app'
 
+// Test API connection
+export const testAPIConnection = async (): Promise<{ success: boolean; message: string; response?: any }> => {
+  try {
+    console.log('Testing API connection to:', API_BASE_URL)
+    
+    // Try multiple endpoints
+    const endpoints = ['/', '/health', '/api/health', '/status']
+    
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`Trying endpoint: ${endpoint}`)
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+
+        console.log(`Endpoint ${endpoint} - Response status:`, response.status)
+        
+        if (response.ok) {
+          const data = await response.json().catch(() => ({ message: 'OK' }))
+          console.log(`Endpoint ${endpoint} - Response data:`, data)
+          return {
+            success: true,
+            message: `API berhasil terkoneksi! (${endpoint})`,
+            response: data
+          }
+        }
+      } catch (endpointError) {
+        console.log(`Endpoint ${endpoint} failed:`, endpointError)
+        continue
+      }
+    }
+    
+    // If all endpoints fail, try a simple GET request
+    const response = await fetch(`${API_BASE_URL}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    console.log('Final API Response status:', response.status)
+    console.log('Final API Response headers:', response.headers)
+
+    if (response.ok) {
+      const data = await response.json().catch(() => ({ message: 'Server is running' }))
+      console.log('Final API Response data:', data)
+      return {
+        success: true,
+        message: 'API berhasil terkoneksi!',
+        response: data
+      }
+    } else {
+      const errorData = await response.text()
+      console.log('API Error response:', errorData)
+      return {
+        success: false,
+        message: `API Error: ${response.status} - ${errorData}`,
+        response: errorData
+      }
+    }
+
+    console.log('API Response status:', response.status)
+    console.log('API Response headers:', response.headers)
+
+    if (response.ok) {
+      const data = await response.json()
+      console.log('API Response data:', data)
+      return {
+        success: true,
+        message: 'API berhasil terkoneksi!',
+        response: data
+      }
+    } else {
+      const errorData = await response.text()
+      console.log('API Error response:', errorData)
+      return {
+        success: false,
+        message: `API Error: ${response.status} - ${errorData}`,
+        response: errorData
+      }
+    }
+  } catch (error) {
+    console.error('API Connection Error:', error)
+    return {
+      success: false,
+      message: `Koneksi gagal: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      response: error
+    }
+  }
+}
+
 // Generic API call function
 async function apiCall<T>(
   endpoint: string,
