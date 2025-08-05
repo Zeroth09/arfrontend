@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 
 interface Player {
@@ -12,6 +12,9 @@ interface Player {
   kills: number
   deaths: number
   position: { x: number; y: number }
+  gps: { lat: number; lng: number }
+  lastSeen: Date
+  isVisible: boolean
 }
 
 interface GameState {
@@ -20,6 +23,18 @@ interface GameState {
   players: Player[]
   winner: 'merah' | 'putih' | null
   gameTime: number
+  currentPlayer: string | null
+  crosshairPosition: { x: number; y: number }
+  isAiming: boolean
+  weaponAmmo: number
+  maxAmmo: number
+}
+
+interface GPSData {
+  lat: number
+  lng: number
+  accuracy: number
+  timestamp: number
 }
 
 export default function DemoPage() {
@@ -28,12 +43,24 @@ export default function DemoPage() {
     timeLeft: 300, // 5 menit
     players: [],
     winner: null,
-    gameTime: 0
+    gameTime: 0,
+    currentPlayer: null,
+    crosshairPosition: { x: 0, y: 0 },
+    isAiming: false,
+    weaponAmmo: 30,
+    maxAmmo: 30
   })
 
   const [cameraView, setCameraView] = useState<'overview' | 'player1' | 'player2'>('overview')
+  const [gpsData, setGpsData] = useState<GPSData | null>(null)
+  const [isGPSEnabled, setIsGPSEnabled] = useState(false)
+  const [humanDetection, setHumanDetection] = useState<{ x: number; y: number; confidence: number }[]>([])
+  
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
 
-  // Initialize demo players
+  // Initialize demo players with GPS coordinates
   useEffect(() => {
     const demoPlayers: Player[] = [
       {
@@ -44,7 +71,10 @@ export default function DemoPage() {
         health: 100,
         kills: 0,
         deaths: 0,
-        position: { x: 100, y: 100 }
+        position: { x: 100, y: 100 },
+        gps: { lat: -6.2088, lng: 106.8456 }, // Jakarta coordinates
+        lastSeen: new Date(),
+        isVisible: true
       },
       {
         id: 'player2',
@@ -54,15 +84,138 @@ export default function DemoPage() {
         health: 100,
         kills: 0,
         deaths: 0,
-        position: { x: 400, y: 300 }
+        position: { x: 400, y: 300 },
+        gps: { lat: -6.2089, lng: 106.8457 }, // Slightly different coordinates
+        lastSeen: new Date(),
+        isVisible: true
       }
     ]
 
     setGameState(prev => ({
       ...prev,
-      players: demoPlayers
+      players: demoPlayers,
+      currentPlayer: 'player1' // Default to player 1
     }))
   }, [])
+
+  // GPS Location tracking
+  const enableGPS = () => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const gpsData: GPSData = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            timestamp: position.timestamp
+          }
+          setGpsData(gpsData)
+          setIsGPSEnabled(true)
+          console.log('GPS enabled:', gpsData)
+        },
+        (error) => {
+          console.error('GPS error:', error)
+          // Fallback to demo GPS data
+          setGpsData({
+            lat: -6.2088,
+            lng: 106.8456,
+            accuracy: 10,
+            timestamp: Date.now()
+          })
+          setIsGPSEnabled(true)
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 30000
+        }
+      )
+    } else {
+      console.log('GPS not available, using demo data')
+      setGpsData({
+        lat: -6.2088,
+        lng: 106.8456,
+        accuracy: 10,
+        timestamp: Date.now()
+      })
+      setIsGPSEnabled(true)
+    }
+  }
+
+  // Camera access for AR
+  const enableCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment', // Use back camera
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        }
+      })
+      
+      streamRef.current = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        videoRef.current.play()
+      }
+      
+      // Start human detection simulation
+      startHumanDetection()
+    } catch (error) {
+      console.error('Camera access error:', error)
+      // Fallback to demo camera view
+    }
+  }
+
+  // Simulate human detection
+  const startHumanDetection = () => {
+    setInterval(() => {
+      // Simulate human detection with random positions
+      const detections = [
+        { x: Math.random() * 640, y: Math.random() * 480, confidence: 0.8 + Math.random() * 0.2 },
+        { x: Math.random() * 640, y: Math.random() * 480, confidence: 0.7 + Math.random() * 0.3 }
+      ]
+      setHumanDetection(detections)
+    }, 1000)
+  }
+
+  // Handle crosshair movement
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    
+    setGameState(prev => ({
+      ...prev,
+      crosshairPosition: { x, y }
+    }))
+  }
+
+  // Handle shooting
+  const handleShoot = () => {
+    if (gameState.weaponAmmo <= 0) {
+      console.log('Out of ammo!')
+      return
+    }
+
+    setGameState(prev => ({
+      ...prev,
+      weaponAmmo: prev.weaponAmmo - 1
+    }))
+
+    // Check if crosshair is on target
+    const targetPlayer = gameState.players.find(p => p.id !== gameState.currentPlayer && p.isAlive)
+    if (targetPlayer) {
+      // Simple hit detection based on crosshair position
+      const hitChance = Math.random()
+      if (hitChance > 0.7) { // 30% hit chance
+        simulateKill(gameState.currentPlayer!, targetPlayer.id)
+        console.log('Target hit!')
+      } else {
+        console.log('Miss!')
+      }
+    }
+  }
 
   // Game timer
   useEffect(() => {
@@ -73,10 +226,8 @@ export default function DemoPage() {
           const newGameTime = prev.gameTime + 1
 
           if (newTimeLeft <= 0) {
-            // Game over - determine winner
             const merahAlive = prev.players.filter(p => p.tim === 'merah' && p.isAlive).length
             const putihAlive = prev.players.filter(p => p.tim === 'putih' && p.isAlive).length
-            
             const winner = merahAlive > putihAlive ? 'merah' : 'putih'
             
             return {
@@ -106,7 +257,6 @@ export default function DemoPage() {
       status: 'countdown'
     }))
 
-    // Countdown
     setTimeout(() => {
       setGameState(prev => ({
         ...prev,
@@ -128,7 +278,10 @@ export default function DemoPage() {
           health: 100,
           kills: 0,
           deaths: 0,
-          position: { x: 100, y: 100 }
+          position: { x: 100, y: 100 },
+          gps: { lat: -6.2088, lng: 106.8456 },
+          lastSeen: new Date(),
+          isVisible: true
         },
         {
           id: 'player2',
@@ -138,11 +291,19 @@ export default function DemoPage() {
           health: 100,
           kills: 0,
           deaths: 0,
-          position: { x: 400, y: 300 }
+          position: { x: 400, y: 300 },
+          gps: { lat: -6.2089, lng: 106.8457 },
+          lastSeen: new Date(),
+          isVisible: true
         }
       ],
       winner: null,
-      gameTime: 0
+      gameTime: 0,
+      currentPlayer: 'player1',
+      crosshairPosition: { x: 0, y: 0 },
+      isAiming: false,
+      weaponAmmo: 30,
+      maxAmmo: 30
     })
   }
 
@@ -163,7 +324,6 @@ export default function DemoPage() {
         return player
       })
 
-      // Check if all players from one team are eliminated
       const merahAlive = updatedPlayers.filter(p => p.tim === 'merah' && p.isAlive).length
       const putihAlive = updatedPlayers.filter(p => p.tim === 'putih' && p.isAlive).length
 
@@ -184,10 +344,28 @@ export default function DemoPage() {
     })
   }
 
+  const reloadWeapon = () => {
+    setGameState(prev => ({
+      ...prev,
+      weaponAmmo: prev.maxAmmo
+    }))
+  }
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+    const R = 6371 // Earth's radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180
+    const dLng = (lng2 - lng1) * Math.PI / 180
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+    return R * c * 1000 // Convert to meters
   }
 
   return (
@@ -198,9 +376,9 @@ export default function DemoPage() {
           <Link href="/" className="text-white hover:text-blue-400 transition-colors">
             ← Kembali ke Home
           </Link>
-          <h1 className="text-3xl font-bold text-glow">Demo 1v1 Gameplay</h1>
+          <h1 className="text-3xl font-bold text-glow">AR Airsoft Demo</h1>
           <div className="text-white text-sm">
-            Testing Mode - 2 Devices
+            GPS + Camera + Human Detection
           </div>
         </div>
 
@@ -210,7 +388,7 @@ export default function DemoPage() {
             <h2 className="text-2xl font-bold text-white mb-4">
               {gameState.status === 'waiting' && 'Menunggu Game Dimulai...'}
               {gameState.status === 'countdown' && 'Game Akan Dimulai...'}
-              {gameState.status === 'playing' && 'Game Sedang Berlangsung'}
+              {gameState.status === 'playing' && 'AR Battle Sedang Berlangsung'}
               {gameState.status === 'finished' && 'Game Selesai'}
             </h2>
 
@@ -234,6 +412,136 @@ export default function DemoPage() {
           </div>
         </div>
 
+        {/* AR Camera View */}
+        <div className="card mb-6">
+          <h3 className="text-xl font-bold text-white mb-4">📱 AR Camera View</h3>
+          
+          <div className="relative bg-black rounded-lg overflow-hidden">
+            {/* Camera Feed */}
+            <video
+              ref={videoRef}
+              className="w-full h-96 object-cover"
+              autoPlay
+              muted
+              playsInline
+            />
+            
+            {/* Canvas for AR overlays */}
+            <canvas
+              ref={canvasRef}
+              className="absolute inset-0 w-full h-96"
+              style={{ pointerEvents: 'none' }}
+            />
+
+            {/* Crosshair */}
+            <div
+              className="absolute w-8 h-8 pointer-events-none"
+              style={{
+                left: gameState.crosshairPosition.x - 16,
+                top: gameState.crosshairPosition.y - 16,
+                transform: 'translate(-50%, -50%)'
+              }}
+            >
+              <div className="w-8 h-8 border-2 border-red-500 rounded-full flex items-center justify-center">
+                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+              </div>
+            </div>
+
+            {/* Human Detection Boxes */}
+            {humanDetection.map((detection, index) => (
+              <div
+                key={index}
+                className="absolute border-2 border-green-500 bg-green-500/20"
+                style={{
+                  left: detection.x - 25,
+                  top: detection.y - 25,
+                  width: 50,
+                  height: 50
+                }}
+              >
+                <div className="text-green-500 text-xs bg-black/50 px-1">
+                  Human {(detection.confidence * 100).toFixed(0)}%
+                </div>
+              </div>
+            ))}
+
+            {/* Controls Overlay */}
+            <div className="absolute bottom-4 left-4 right-4 flex justify-between">
+              <button
+                onClick={handleShoot}
+                disabled={gameState.weaponAmmo <= 0}
+                className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg"
+              >
+                🔫 Shoot ({gameState.weaponAmmo}/{gameState.maxAmmo})
+              </button>
+              
+              <button
+                onClick={reloadWeapon}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
+              >
+                🔄 Reload
+              </button>
+            </div>
+          </div>
+
+          {/* Camera Controls */}
+          <div className="mt-4 flex space-x-4">
+            <button
+              onClick={enableCamera}
+              className="btn-primary"
+            >
+              📷 Enable Camera
+            </button>
+            
+            <button
+              onClick={enableGPS}
+              className="btn-secondary"
+            >
+              📍 Enable GPS
+            </button>
+          </div>
+        </div>
+
+        {/* GPS and Location Data */}
+        <div className="grid md:grid-cols-2 gap-6 mb-6">
+          <div className="card">
+            <h3 className="text-xl font-bold text-white mb-4">📍 GPS Data</h3>
+            {gpsData ? (
+              <div className="space-y-2 text-gray-300">
+                <div>Latitude: {gpsData.lat.toFixed(6)}</div>
+                <div>Longitude: {gpsData.lng.toFixed(6)}</div>
+                <div>Accuracy: {gpsData.accuracy.toFixed(1)}m</div>
+                <div>Status: {isGPSEnabled ? '✅ Active' : '❌ Inactive'}</div>
+              </div>
+            ) : (
+              <div className="text-gray-400">GPS not enabled</div>
+            )}
+          </div>
+
+          <div className="card">
+            <h3 className="text-xl font-bold text-white mb-4">🎯 Target Distance</h3>
+            {gpsData && gameState.players.length > 0 ? (
+              <div className="space-y-2 text-gray-300">
+                {gameState.players
+                  .filter(p => p.id !== gameState.currentPlayer)
+                  .map(player => {
+                    const distance = calculateDistance(
+                      gpsData.lat, gpsData.lng,
+                      player.gps.lat, player.gps.lng
+                    )
+                    return (
+                      <div key={player.id}>
+                        {player.nama}: {distance.toFixed(1)}m
+                      </div>
+                    )
+                  })}
+              </div>
+            ) : (
+              <div className="text-gray-400">No GPS data</div>
+            )}
+          </div>
+        </div>
+
         {/* Game Controls */}
         <div className="grid md:grid-cols-2 gap-6 mb-6">
           <div className="card">
@@ -244,7 +552,7 @@ export default function DemoPage() {
                   onClick={startGame}
                   className="w-full btn-primary"
                 >
-                  🚀 Mulai Game Demo
+                  🚀 Mulai AR Battle
                 </button>
               )}
 
@@ -277,99 +585,29 @@ export default function DemoPage() {
           </div>
 
           <div className="card">
-            <h3 className="text-xl font-bold text-white mb-4">Camera Controls</h3>
+            <h3 className="text-xl font-bold text-white mb-4">Player Selection</h3>
             <div className="space-y-2">
               <button
-                onClick={() => setCameraView('overview')}
+                onClick={() => setGameState(prev => ({ ...prev, currentPlayer: 'player1' }))}
                 className={`w-full p-3 rounded-lg transition-colors ${
-                  cameraView === 'overview'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
-              >
-                📷 Overview Camera
-              </button>
-              <button
-                onClick={() => setCameraView('player1')}
-                className={`w-full p-3 rounded-lg transition-colors ${
-                  cameraView === 'player1'
+                  gameState.currentPlayer === 'player1'
                     ? 'bg-red-600 text-white'
                     : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 }`}
               >
-                🎮 Player 1 Camera
+                🎮 Player 1 (Merah)
               </button>
               <button
-                onClick={() => setCameraView('player2')}
+                onClick={() => setGameState(prev => ({ ...prev, currentPlayer: 'player2' }))}
                 className={`w-full p-3 rounded-lg transition-colors ${
-                  cameraView === 'player2'
+                  gameState.currentPlayer === 'player2'
                     ? 'bg-white text-gray-900'
                     : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 }`}
               >
-                🎮 Player 2 Camera
+                🎮 Player 2 (Putih)
               </button>
             </div>
-          </div>
-        </div>
-
-        {/* Game Arena */}
-        <div className="card mb-6">
-          <h3 className="text-xl font-bold text-white mb-4">
-            {cameraView === 'overview' && '🎯 Game Arena - Overview'}
-            {cameraView === 'player1' && '🎮 Player 1 View'}
-            {cameraView === 'player2' && '🎮 Player 2 View'}
-          </h3>
-
-          <div className="relative bg-gray-800 rounded-lg p-6 min-h-[400px] border-2 border-gray-600">
-            {/* Arena Background */}
-            <div className="absolute inset-0 bg-gradient-to-br from-green-900/20 to-blue-900/20 rounded-lg"></div>
-
-            {/* Player 1 */}
-            <div
-              className={`absolute w-16 h-16 rounded-full flex items-center justify-center text-white font-bold transition-all duration-300 ${
-                gameState.players.find(p => p.id === 'player1')?.isAlive
-                  ? 'bg-red-500 animate-pulse'
-                  : 'bg-gray-500 opacity-50'
-              }`}
-              style={{
-                left: `${gameState.players.find(p => p.id === 'player1')?.position.x || 100}px`,
-                top: `${gameState.players.find(p => p.id === 'player1')?.position.y || 100}px`
-              }}
-            >
-              P1
-            </div>
-
-            {/* Player 2 */}
-            <div
-              className={`absolute w-16 h-16 rounded-full flex items-center justify-center text-white font-bold transition-all duration-300 ${
-                gameState.players.find(p => p.id === 'player2')?.isAlive
-                  ? 'bg-white text-gray-900 animate-pulse'
-                  : 'bg-gray-500 opacity-50'
-              }`}
-              style={{
-                left: `${gameState.players.find(p => p.id === 'player2')?.position.x || 400}px`,
-                top: `${gameState.players.find(p => p.id === 'player2')?.position.y || 300}px`
-              }}
-            >
-              P2
-            </div>
-
-            {/* Camera View Indicator */}
-            {cameraView !== 'overview' && (
-              <div className="absolute top-4 right-4 bg-black/50 text-white px-3 py-1 rounded-lg text-sm">
-                {cameraView === 'player1' ? 'Player 1 Camera' : 'Player 2 Camera'}
-              </div>
-            )}
-
-            {/* Crosshair for player view */}
-            {cameraView !== 'overview' && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-8 h-8 border-2 border-red-500 rounded-full flex items-center justify-center">
-                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
@@ -380,6 +618,7 @@ export default function DemoPage() {
               <h3 className="text-xl font-bold text-white mb-4 flex items-center">
                 {player.tim === 'merah' ? '🔴' : '⚪'} {player.nama}
                 {!player.isAlive && <span className="ml-2 text-red-400">💀 ELIMINATED</span>}
+                {player.id === gameState.currentPlayer && <span className="ml-2 text-blue-400">🎯 YOU</span>}
               </h3>
 
               <div className="space-y-3">
@@ -411,6 +650,12 @@ export default function DemoPage() {
                   </div>
                 </div>
 
+                {/* GPS Coordinates */}
+                <div className="text-xs text-gray-400">
+                  <div>GPS: {player.gps.lat.toFixed(6)}, {player.gps.lng.toFixed(6)}</div>
+                  <div>Last Seen: {player.lastSeen.toLocaleTimeString()}</div>
+                </div>
+
                 {/* Status */}
                 <div className="text-center">
                   <div className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
@@ -426,21 +671,21 @@ export default function DemoPage() {
           ))}
         </div>
 
-        {/* Game Info */}
+        {/* AR Game Info */}
         <div className="card mt-6">
-          <h3 className="text-xl font-bold text-white mb-4">📋 Demo Game Info</h3>
+          <h3 className="text-xl font-bold text-white mb-4">📋 AR Game Features</h3>
           <div className="grid md:grid-cols-3 gap-4 text-gray-300">
             <div>
-              <h4 className="font-bold text-white mb-2">🎯 Objective</h4>
-              <p className="text-sm">Eliminasi lawan dalam 1v1 battle</p>
+              <h4 className="font-bold text-white mb-2">🎯 Crosshair Targeting</h4>
+              <p className="text-sm">Real-time crosshair untuk targeting lawan</p>
             </div>
             <div>
-              <h4 className="font-bold text-white mb-2">⏱️ Time Limit</h4>
-              <p className="text-sm">5 menit atau eliminasi total</p>
+              <h4 className="font-bold text-white mb-2">📍 GPS Tracking</h4>
+              <p className="text-sm">GPS coordinates untuk positioning</p>
             </div>
             <div>
-              <h4 className="font-bold text-white mb-2">🎮 Controls</h4>
-              <p className="text-sm">Simulasi eliminasi untuk testing</p>
+              <h4 className="font-bold text-white mb-2">👤 Human Detection</h4>
+              <p className="text-sm">AI detection untuk identify targets</p>
             </div>
           </div>
         </div>
