@@ -25,14 +25,11 @@ export default function LobbyPage() {
     gameMaster: false
   })
 
-  const [playerData, setPlayerData] = useState<{nama: string, tim: 'merah' | 'putih'} | null>(null)
-
   useEffect(() => {
     // Get player data from localStorage
     const stored = localStorage.getItem('playerData')
     if (stored) {
       const data = JSON.parse(stored)
-      setPlayerData(data)
       
       // Add current player to players list
       const currentPlayer: Player = {

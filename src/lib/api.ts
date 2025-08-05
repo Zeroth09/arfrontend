@@ -93,8 +93,8 @@ export const gameAPI = {
     })
   },
 
-  getGameState: async (roomId: string): Promise<ApiResponse<any>> => {
-    return apiCall<any>(`/game/rooms/${roomId}/state`)
+  getGameState: async (roomId: string): Promise<ApiResponse<unknown>> => {
+    return apiCall<unknown>(`/game/rooms/${roomId}/state`)
   },
 
   updatePlayerPosition: async (
@@ -125,16 +125,16 @@ export const statsAPI = {
     return apiCall<UserStats>('/stats/user')
   },
 
-  getLeaderboard: async (): Promise<ApiResponse<any[]>> => {
-    return apiCall<any[]>('/stats/leaderboard')
+  getLeaderboard: async (): Promise<ApiResponse<unknown[]>> => {
+    return apiCall<unknown[]>('/stats/leaderboard')
   },
 
-  getAchievements: async (): Promise<ApiResponse<any[]>> => {
-    return apiCall<any[]>('/stats/achievements')
+  getAchievements: async (): Promise<ApiResponse<unknown[]>> => {
+    return apiCall<unknown[]>('/stats/achievements')
   },
 
-  getGameHistory: async (page = 1, limit = 10): Promise<ApiResponse<any>> => {
-    return apiCall<any>(`/stats/history?page=${page}&limit=${limit}`)
+  getGameHistory: async (page = 1, limit = 10): Promise<ApiResponse<unknown>> => {
+    return apiCall<unknown>(`/stats/history?page=${page}&limit=${limit}`)
   },
 }
 
@@ -177,11 +177,14 @@ export const apiUtils = {
   },
 
   // Handle API errors
-  handleError: (error: any): string => {
-    if (error.response?.data?.message) {
-      return error.response.data.message
+  handleError: (error: unknown): string => {
+    if (error && typeof error === 'object' && 'response' in error) {
+      const response = (error as { response?: { data?: { message?: string } } }).response
+      if (response?.data?.message) {
+        return response.data.message
+      }
     }
-    if (error.message) {
+    if (error instanceof Error) {
       return error.message
     }
     return 'Terjadi kesalahan yang tidak diketahui'
@@ -195,7 +198,7 @@ export class GameWebSocket {
   private maxReconnectAttempts = 5
   private reconnectDelay = 1000
 
-  constructor(private roomId: string, private onMessage: (data: any) => void) {}
+  constructor(private roomId: string, private onMessage: (data: unknown) => void) {}
 
   connect(): void {
     const token = localStorage.getItem('auth_token')
@@ -243,7 +246,7 @@ export class GameWebSocket {
     }
   }
 
-  send(data: any): void {
+  send(data: unknown): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(data))
     }

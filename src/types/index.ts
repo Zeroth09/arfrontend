@@ -117,7 +117,7 @@ export interface GameEvent {
   type: 'player_join' | 'player_leave' | 'player_kill' | 'player_death' | 'game_start' | 'game_end'
   playerId?: string
   targetId?: string
-  data?: any
+  data?: unknown
   timestamp: Date
 }
 

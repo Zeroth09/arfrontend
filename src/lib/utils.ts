@@ -53,7 +53,7 @@ export function generateId(): string {
 }
 
 // Debounce function
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
@@ -65,7 +65,7 @@ export function debounce<T extends (...args: any[]) => any>(
 }
 
 // Throttle function
-export function throttle<T extends (...args: any[]) => any>(
+export function throttle<T extends (...args: unknown[]) => unknown>(
   func: T,
   limit: number
 ): (...args: Parameters<T>) => void {
@@ -81,7 +81,7 @@ export function throttle<T extends (...args: any[]) => any>(
 
 // Local storage utilities
 export const storage = {
-  get: (key: string): any => {
+  get: (key: string): unknown => {
     try {
       const item = localStorage.getItem(key)
       return item ? JSON.parse(item) : null
@@ -90,7 +90,7 @@ export const storage = {
     }
   },
   
-  set: (key: string, value: any): void => {
+  set: (key: string, value: unknown): void => {
     try {
       localStorage.setItem(key, JSON.stringify(value))
     } catch {
