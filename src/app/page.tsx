@@ -196,15 +196,19 @@ export default function HomePage() {
             <p className="text-gray-400 text-sm">
               © 2025 Airsoft AR - Battle Proximity Game
             </p>
-            <div className="flex justify-center space-x-4 mt-4">
-              <a href="https://github.com/Zeroth09/arfrontend.git" className="text-blue-400 hover:text-blue-300 transition-colors">
-                GitHub
-              </a>
-              <span className="text-gray-600">|</span>
-              <Link href="/game-master" className="text-blue-400 hover:text-blue-300 transition-colors">
-                Game Master
-              </Link>
-            </div>
+                               <div className="flex justify-center space-x-4 mt-4">
+                     <a href="https://github.com/Zeroth09/arfrontend.git" className="text-blue-400 hover:text-blue-300 transition-colors">
+                       GitHub
+                     </a>
+                     <span className="text-gray-600">|</span>
+                     <Link href="/game-master" className="text-blue-400 hover:text-blue-300 transition-colors">
+                       Game Master
+                     </Link>
+                     <span className="text-gray-600">|</span>
+                     <Link href="/demo" className="text-blue-400 hover:text-blue-300 transition-colors">
+                       Demo 1v1
+                     </Link>
+                   </div>
           </div>
         </div>
       </div>
