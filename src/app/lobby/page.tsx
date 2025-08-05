@@ -56,7 +56,7 @@ export default function LobbyPage() {
         currentPlayerRef.current = currentPlayer
         
         // Initialize WebSocket connection
-        const serverUrl = 'https://backendairsoftar-production.up.railway.app'
+        const serverUrl = 'https://confident-clarity-production.up.railway.app'
         const ws = new MultiplayerWebSocket(serverUrl, currentPlayer.id, (message) => {
           console.log('Received lobby message:', message)
           
