@@ -220,6 +220,33 @@ export default function DemoPage() {
     }
   }
 
+  // Set crosshair to center on mount and resize
+  useEffect(() => {
+    if (gameContainerRef.current) {
+      const center = calculateScreenCenter(gameContainerRef.current)
+      setGameState(prev => ({
+        ...prev,
+        crosshairPosition: center
+      }))
+    }
+  }, [])
+
+  // Handle window resize to keep crosshair centered
+  useEffect(() => {
+    const handleResize = () => {
+      if (gameContainerRef.current) {
+        const center = calculateScreenCenter(gameContainerRef.current)
+        setGameState(prev => ({
+          ...prev,
+          crosshairPosition: center
+        }))
+      }
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
   // Shooting mechanics
   const handleShoot = () => {
     if (gameState.weaponAmmo > 0 && gameState.status === 'playing') {
@@ -305,34 +332,34 @@ export default function DemoPage() {
     setHumanDetectionActive(false)
   }
 
-  // Mouse/touch controls
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (gameContainerRef.current) {
-      const rect = gameContainerRef.current.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const y = e.clientY - rect.top
-      
-      setGameState(prev => ({
-        ...prev,
-        crosshairPosition: { x, y }
-      }))
-    }
-  }
+  // Mouse/touch controls - REMOVED, crosshair stays centered
+  // const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+  //   if (gameContainerRef.current) {
+  //     const rect = gameContainerRef.current.getBoundingClientRect()
+  //     const x = e.clientX - rect.left
+  //     const y = e.clientY - rect.top
+  //     
+  //     setGameState(prev => ({
+  //       ...prev,
+  //       crosshairPosition: { x, y }
+  //     }))
+  //   }
+  // }
 
-  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    if (gameContainerRef.current && e.touches[0]) {
-      const rect = gameContainerRef.current.getBoundingClientRect()
-      const touch = e.touches[0]
-      const x = touch.clientX - rect.left
-      const y = touch.clientY - rect.top
-      
-      setGameState(prev => ({
-        ...prev,
-        crosshairPosition: { x, y }
-      }))
-    }
-  }
+  // const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+  //   e.preventDefault()
+  //   if (gameContainerRef.current && e.touches[0]) {
+  //     const rect = gameContainerRef.current.getBoundingClientRect()
+  //     const touch = e.touches[0]
+  //     const x = touch.clientX - rect.left
+  //     const y = touch.clientY - rect.top
+  //     
+  //     setGameState(prev => ({
+  //       ...prev,
+  //       crosshairPosition: { x, y }
+  //     }))
+  //   }
+  // }
 
   const simulateKill = (killerId: string, victimId: string) => {
     setGameState(prev => ({
@@ -399,12 +426,8 @@ export default function DemoPage() {
         <div
           ref={gameContainerRef}
           className="relative w-full h-[calc(100vh-200px)] bg-gray-800 overflow-hidden"
-          onMouseMove={handleMouseMove}
-          onTouchMove={handleTouchMove}
-          onTouchStart={handleShoot}
-          onClick={handleShoot}
         >
-          {/* Crosshair */}
+          {/* Crosshair - Always Centered */}
           <div
             className="absolute w-8 h-8 pointer-events-none z-50"
             style={{
@@ -448,6 +471,40 @@ export default function DemoPage() {
               </div>
             </div>
           ))}
+
+          {/* Fire Button - Large and Easy to Access */}
+          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-50">
+            <button
+              onClick={handleShoot}
+              disabled={gameState.weaponAmmo <= 0 || gameState.status !== 'playing'}
+              className={`
+                w-24 h-24 rounded-full border-4 font-bold text-white text-lg
+                transition-all duration-200 transform hover:scale-110 active:scale-95
+                ${gameState.weaponAmmo > 0 && gameState.status === 'playing'
+                  ? 'bg-red-600 hover:bg-red-700 border-red-400 shadow-lg shadow-red-500/50'
+                  : 'bg-gray-600 border-gray-400 cursor-not-allowed'
+                }
+              `}
+            >
+              🔫 FIRE
+            </button>
+          </div>
+
+          {/* Ammo Counter */}
+          <div className="absolute top-4 right-4 bg-black/70 text-white px-3 py-2 rounded-lg z-50">
+            <div className="text-center">
+              <div className="text-2xl font-bold">{gameState.weaponAmmo}</div>
+              <div className="text-xs">AMMO</div>
+            </div>
+          </div>
+
+          {/* Game Status */}
+          <div className="absolute top-4 left-4 bg-black/70 text-white px-3 py-2 rounded-lg z-50">
+            <div className="text-center">
+              <div className="text-lg font-bold">{formatTime(gameState.timeLeft)}</div>
+              <div className="text-xs">{gameState.status.toUpperCase()}</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -500,16 +557,8 @@ export default function DemoPage() {
             onClick={reloadWeapon}
             className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg"
           >
-            Reload ({gameState.weaponAmmo}/{gameState.maxAmmo})
+            Reload Weapon
           </button>
-        </div>
-
-        {/* Game Info */}
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-          <div>Time: {formatTime(gameState.timeLeft)}</div>
-          <div>Status: {gameState.status}</div>
-          <div>Players: {gameState.players.length}</div>
-          <div>Ammo: {gameState.weaponAmmo}/{gameState.maxAmmo}</div>
         </div>
 
         {/* GPS Info */}
