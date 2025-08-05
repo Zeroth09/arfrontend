@@ -46,7 +46,8 @@ export class MultiplayerWebSocket {
       })
 
       this.socket.on('connect', () => {
-        console.log('Socket.io connected to multiplayer server')
+        console.log('✅ Socket.io connected to multiplayer server:', this.serverUrl)
+        console.log('🔗 Socket ID:', this.socket?.id)
         this.reconnectAttempts = 0
         
         // Send player join message
@@ -54,6 +55,7 @@ export class MultiplayerWebSocket {
           playerId: this.playerId,
           timestamp: Date.now()
         })
+        console.log('📤 Sent player_join event for player:', this.playerId)
       })
 
       this.socket.on('disconnect', () => {
@@ -71,7 +73,7 @@ export class MultiplayerWebSocket {
 
       // Handle lobby events
       this.socket.on('player_join', (data) => {
-        console.log('Player joined:', data)
+        console.log('👥 Received player_join event:', data)
         this.onMessage({
           type: 'player_join',
           playerId: data.playerId || 'unknown',
@@ -81,7 +83,7 @@ export class MultiplayerWebSocket {
       })
 
       this.socket.on('player_leave', (data) => {
-        console.log('Player left:', data)
+        console.log('👋 Received player_leave event:', data)
         this.onMessage({
           type: 'player_leave',
           playerId: data.playerId || 'unknown',

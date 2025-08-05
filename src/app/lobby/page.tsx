@@ -82,6 +82,10 @@ export default function LobbyPage() {
         
         // Send player join message
         setTimeout(() => {
+          console.log('📤 Sending player_join event:', {
+            playerId: currentPlayer.id,
+            player: currentPlayer
+          });
           ws.emit('player_join', {
             playerId: currentPlayer.id,
             player: currentPlayer,
@@ -122,10 +126,25 @@ export default function LobbyPage() {
   // Handle incoming messages
   const handlePlayerJoin = (message: LobbyMessage) => {
     console.log('👥 Player joined:', message.data.player);
-    setGameState(prev => ({
-      ...prev,
-      players: [...prev.players, message.data.player as Player]
-    }));
+    setGameState(prev => {
+      // Check if player already exists
+      const existingPlayer = prev.players.find(p => p.id === message.data.player?.id);
+      if (existingPlayer) {
+        console.log('Player already exists, updating...');
+        return {
+          ...prev,
+          players: prev.players.map(p => 
+            p.id === message.data.player?.id ? message.data.player as Player : p
+          )
+        };
+      } else {
+        console.log('Adding new player...');
+        return {
+          ...prev,
+          players: [...prev.players, message.data.player as Player]
+        };
+      }
+    });
   };
 
   const handlePlayerLeave = (message: LobbyMessage) => {
@@ -155,6 +174,14 @@ export default function LobbyPage() {
 
   const merahPlayers = gameState.players.filter(p => p.tim === 'merah')
   const putihPlayers = gameState.players.filter(p => p.tim === 'putih')
+  
+  // Debug logging
+  console.log('🎮 Current game state:', {
+    totalPlayers: gameState.players.length,
+    merahPlayers: merahPlayers.length,
+    putihPlayers: putihPlayers.length,
+    players: gameState.players.map(p => ({ id: p.id, nama: p.nama, tim: p.tim }))
+  })
 
   const canStartGame = merahPlayers.length >= 1 && putihPlayers.length >= 1
 
