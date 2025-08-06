@@ -231,26 +231,36 @@ export class MultiplayerTargetDetection {
   private getNearbyPlayers() {
     if (!this.currentPlayerLocation) return []
     
-    // Simulate nearby players - VERY RARE
+    // Simulate nearby players - DEMO BATTLE MODE
     const nearbyPlayers = []
-    const hasNearbyPlayers = Math.random() < 0.1 // Only 10% chance to have nearby players
+    const hasNearbyPlayers = Math.random() < 0.3 // 30% chance for demo battle
     
     if (hasNearbyPlayers) {
-      const numPlayers = 1 // Only 1 player at a time
-      
-      for (let i = 0; i < numPlayers; i++) {
-        const offsetLat = (Math.random() - 0.5) * 0.0005 // ~50m
-        const offsetLng = (Math.random() - 0.5) * 0.0005 // ~50m
-        
-        nearbyPlayers.push({
-          id: `player_${Date.now()}_${i}`,
-          nama: `Player ${i + 1}`,
-          tim: Math.random() > 0.5 ? 'merah' : 'putih',
-          latitude: this.currentPlayerLocation.latitude + offsetLat,
-          longitude: this.currentPlayerLocation.longitude + offsetLng,
+      // Demo: Always spawn 2 players (Red vs White teams)
+      const players = [
+        {
+          id: 'demo_player_red',
+          nama: 'Red Team Player',
+          tim: 'merah',
+          latitude: this.currentPlayerLocation.latitude + 0.0002, // ~20m
+          longitude: this.currentPlayerLocation.longitude + 0.0002,
           health: 100
-        })
-      }
+        },
+        {
+          id: 'demo_player_white', 
+          nama: 'White Team Player',
+          tim: 'putih',
+          latitude: this.currentPlayerLocation.latitude - 0.0002, // ~20m opposite
+          longitude: this.currentPlayerLocation.longitude - 0.0002,
+          health: 100
+        }
+      ]
+      
+      // Randomly select 1-2 players for variety
+      const numPlayers = Math.random() > 0.5 ? 2 : 1
+      const selectedPlayers = players.slice(0, numPlayers)
+      
+      nearbyPlayers.push(...selectedPlayers)
     }
     
     return nearbyPlayers

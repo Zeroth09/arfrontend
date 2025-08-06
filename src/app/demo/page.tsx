@@ -26,7 +26,7 @@ export default function DemoPage() {
     currentPlayer: {
       id: 'demo-player',
       nama: 'Demo Player',
-      tim: 'merah',
+      tim: 'merah', // Default red team
       health: 3,
       kills: 0,
       deaths: 0
@@ -47,6 +47,17 @@ export default function DemoPage() {
   useEffect(() => {
     // Start demo immediately
     setDemoState(prev => ({ ...prev, status: 'playing' }))
+    
+    // Demo: Switch teams every 30 seconds for testing
+    const teamSwitchInterval = setInterval(() => {
+      setDemoState(prev => ({
+        ...prev,
+        currentPlayer: {
+          ...prev.currentPlayer,
+          tim: prev.currentPlayer.tim === 'merah' ? 'putih' : 'merah'
+        }
+      }))
+    }, 30000) // Switch every 30 seconds
     
     // Start game timer
     gameIntervalRef.current = setInterval(() => {
@@ -96,6 +107,9 @@ export default function DemoPage() {
       }
       if (hitInterval) {
         clearInterval(hitInterval)
+      }
+      if (teamSwitchInterval) {
+        clearInterval(teamSwitchInterval)
       }
       stopCamera()
     }
@@ -450,6 +464,9 @@ export default function DemoPage() {
           <div className="text-sm">
             Team: {demoState.currentPlayer.tim === 'merah' ? '🔴 Merah' : '⚪ Putih'}
           </div>
+          <div className="text-xs text-yellow-300 mt-1">
+            Demo: Red vs White Battle
+          </div>
         </div>
         
                  {/* Detection Status */}
@@ -472,7 +489,10 @@ export default function DemoPage() {
         <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white">
           <div className="text-sm text-yellow-400 font-bold">🎮 Demo Mode</div>
           <div className="text-xs text-gray-300">
-            Test fitur AR dan target detection
+            Red vs White Battle Test
+          </div>
+          <div className="text-xs text-blue-300 mt-1">
+            Team switches every 30s
           </div>
         </div>
       </div>
