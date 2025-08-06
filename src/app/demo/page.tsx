@@ -218,7 +218,7 @@ export default function DemoPage() {
   }
 
   // Handle real human elimination
-  const handleRealHumanEliminated = (human: RealHumanTarget) => {
+  const handleRealHumanEliminated = (_human: RealHumanTarget) => {
     setDemoState(prev => ({
       ...prev,
       currentPlayer: {
