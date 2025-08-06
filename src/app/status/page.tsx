@@ -33,28 +33,28 @@ export default function StatusPage() {
   const [endpoints, setEndpoints] = useState<ApiEndpoint[]>([
     {
       name: 'Server Health',
-      url: 'https://backend-production-9ccf.up.railway.app/',
+      url: 'https://confident-clarity-production.up.railway.app/',
       status: 'online',
       responseTime: 45,
       lastCheck: new Date()
     },
     {
       name: 'Authentication API',
-      url: 'https://backend-production-9ccf.up.railway.app/auth',
+      url: 'https://confident-clarity-production.up.railway.app/auth',
       status: 'online',
       responseTime: 52,
       lastCheck: new Date()
     },
     {
       name: 'Game API',
-      url: 'https://backend-production-9ccf.up.railway.app/game',
+      url: 'https://confident-clarity-production.up.railway.app/game',
       status: 'online',
       responseTime: 38,
       lastCheck: new Date()
     },
     {
       name: 'WebSocket',
-      url: 'wss://backend-production-9ccf.up.railway.app/ws',
+      url: 'wss://confident-clarity-production.up.railway.app/ws',
       status: 'online',
       responseTime: 12,
       lastCheck: new Date()

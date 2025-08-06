@@ -18,8 +18,46 @@ export class MultiplayerWebSocket {
     this.onMessageCallback = onMessage
   }
 
-  connect(): void {
-    console.log('🔌 Attempting WebSocket connection first...')
+  // Health check method
+  async checkServerHealth(): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.serverUrl}/`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: AbortSignal.timeout(5000) // 5 second timeout
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log('✅ Server health check passed:', data)
+        return true
+      } else {
+        console.error('❌ Server health check failed:', response.status)
+        return false
+      }
+    } catch (error) {
+      console.error('❌ Server health check error:', error)
+      return false
+    }
+  }
+
+  async connect(): Promise<void> {
+    console.log('🔌 Checking server health before connecting...')
+    
+    // Check server health first
+    const isHealthy = await this.checkServerHealth()
+    if (!isHealthy) {
+      console.error('❌ Server is not healthy, will retry connection later')
+      // Retry after 5 seconds
+      setTimeout(() => {
+        this.connect()
+      }, 5000)
+      return
+    }
+    
+    console.log('🔌 Attempting WebSocket connection...')
     this.connectWebSocket()
   }
 
@@ -32,8 +70,10 @@ export class MultiplayerWebSocket {
         reconnection: true,
         reconnectionAttempts: this.maxReconnectAttempts,
         reconnectionDelay: this.reconnectDelay,
-        timeout: 10000,
-        forceNew: true
+        timeout: 15000, // Increased timeout
+        forceNew: true,
+        upgrade: true,
+        rememberUpgrade: false
       })
 
       this.socket.on('connect', () => {
@@ -46,11 +86,28 @@ export class MultiplayerWebSocket {
           timestamp: Date.now()
         })
         console.log('📤 Sent player_join event for player:', this.playerId)
+        
+        // Emit connection status update
+        this.onMessageCallback({
+          type: 'connection_status',
+          status: 'connected',
+          connectionType: 'WebSocket',
+          timestamp: Date.now()
+        })
       })
 
       this.socket.on('disconnect', (reason) => {
         console.log('🔌 Socket.io disconnected:', reason)
         this.isConnected = false
+        
+        // Emit connection status update
+        this.onMessageCallback({
+          type: 'connection_status',
+          status: 'disconnected',
+          reason: reason,
+          timestamp: Date.now()
+        })
+        
         if (reason === 'io server disconnect') {
           console.log('🔄 Server disconnected, attempting to reconnect...')
           this.socket?.connect()
@@ -62,6 +119,14 @@ export class MultiplayerWebSocket {
         console.error('🔗 Server URL:', this.serverUrl)
         console.error('🆔 Player ID:', this.playerId)
         this.isConnected = false
+        
+        // Emit connection status update
+        this.onMessageCallback({
+          type: 'connection_status',
+          status: 'error',
+          error: error.message,
+          timestamp: Date.now()
+        })
         
         // Try SSE as fallback
         if (!this.useSSE) {
@@ -177,20 +242,34 @@ export class MultiplayerWebSocket {
     try {
       console.log(`📤 Emitting ${event} via HTTP API:`, data)
       
+      // Add timeout and retry logic
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+      
       if (event === 'player_join') {
         const response = await fetch(`${this.serverUrl}/api/player/join`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(data)
+          body: JSON.stringify(data),
+          signal: controller.signal
         })
+        
+        clearTimeout(timeoutId)
         
         if (response.ok) {
           const result = await response.json()
           console.log('✅ HTTP API response:', result)
         } else {
-          console.error('❌ HTTP API error:', response.status)
+          console.error('❌ HTTP API error:', response.status, response.statusText)
+          // Try to get error details
+          try {
+            const errorText = await response.text()
+            console.error('❌ HTTP API error details:', errorText)
+          } catch (e) {
+            console.error('❌ Could not read error response')
+          }
         }
       } else if (event === 'player_leave') {
         const response = await fetch(`${this.serverUrl}/api/player/leave`, {
@@ -198,18 +277,34 @@ export class MultiplayerWebSocket {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(data)
+          body: JSON.stringify(data),
+          signal: controller.signal
         })
+        
+        clearTimeout(timeoutId)
         
         if (response.ok) {
           const result = await response.json()
           console.log('✅ HTTP API response:', result)
         } else {
-          console.error('❌ HTTP API error:', response.status)
+          console.error('❌ HTTP API error:', response.status, response.statusText)
         }
       }
     } catch (error) {
       console.error('❌ HTTP API emit failed:', error)
+      
+      // Check if it's a timeout or network error
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          console.error('❌ HTTP API timeout - server might be overloaded')
+        } else if (error.message.includes('ERR_INSUFFICIENT_RESOURCES')) {
+          console.error('❌ Server resources exhausted - trying again later')
+          // Retry after a longer delay
+          setTimeout(() => {
+            this.emitViaHTTP(event, data)
+          }, 5000)
+        }
+      }
     }
   }
 

@@ -124,7 +124,7 @@ export default function HomePage() {
               <span className="text-green-400 font-semibold">Server Online</span>
             </div>
             <p className="text-gray-400 text-sm mb-4">
-              https://backend-production-9ccf.up.railway.app/
+              https://confident-clarity-production.up.railway.app/
             </p>
             
             {/* API Test Button */}

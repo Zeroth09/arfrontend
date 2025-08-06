@@ -21,6 +21,10 @@ interface GameState {
 interface LobbyMessage {
   type: string
   playerId?: string
+  status?: string
+  connectionType?: string
+  reason?: string
+  error?: string
   data: {
     player?: Player
     status?: 'waiting' | 'starting' | 'playing' | 'finished'
@@ -39,6 +43,7 @@ export default function LobbyPage() {
   })
   const [isConnected, setIsConnected] = useState(false)
   const [multiplayer, setMultiplayer] = useState<MultiplayerWebSocket | null>(null)
+  const [connectionStatus, setConnectionStatus] = useState<string>('Disconnected')
   const currentPlayerRef = useRef<Player | null>(null)
 
   // Initialize current player and WebSocket connection
@@ -73,14 +78,20 @@ export default function LobbyPage() {
             handleGameStateUpdate(lobbyMessage)
           } else if (lobbyMessage.type === 'current_players') {
             handleCurrentPlayers(lobbyMessage)
+          } else if (lobbyMessage.type === 'connection_status') {
+            handleConnectionStatus(lobbyMessage)
           } else {
             console.log('Unknown message type:', lobbyMessage.type)
           }
         })
         
         setMultiplayer(ws)
-        ws.connect()
+        ws.connect().catch(error => {
+          console.error('Failed to connect to server:', error)
+          setConnectionStatus('Connection Failed')
+        })
         setIsConnected(true)
+        setConnectionStatus('Connecting...')
         
         // Send player join message
         setTimeout(() => {
@@ -124,6 +135,26 @@ export default function LobbyPage() {
       }
     }
   }, [multiplayer])
+
+  // Periodic server health check
+  useEffect(() => {
+    if (!multiplayer) return;
+    
+    const healthCheckInterval = setInterval(async () => {
+      try {
+        const isHealthy = await multiplayer.checkServerHealth();
+        if (!isHealthy) {
+          console.warn('⚠️ Server health check failed');
+          setConnectionStatus('Server Unhealthy');
+        }
+      } catch (error) {
+        console.error('❌ Health check error:', error);
+        setConnectionStatus('Health Check Failed');
+      }
+    }, 30000); // Check every 30 seconds
+    
+    return () => clearInterval(healthCheckInterval);
+  }, [multiplayer]);
 
   // Handle incoming messages
   const handlePlayerJoin = (message: LobbyMessage) => {
@@ -172,6 +203,20 @@ export default function LobbyPage() {
       ...prev,
       players: message.data.players as Player[]
     }));
+  };
+
+  const handleConnectionStatus = (message: LobbyMessage) => {
+    console.log('🔗 Connection status update:', message);
+    if (message.status === 'connected') {
+      setIsConnected(true);
+      setConnectionStatus(`Connected (${message.connectionType || 'Unknown'})`);
+    } else if (message.status === 'disconnected') {
+      setIsConnected(false);
+      setConnectionStatus(`Disconnected: ${message.reason || 'Unknown reason'}`);
+    } else if (message.status === 'error') {
+      setIsConnected(false);
+      setConnectionStatus(`Error: ${message.error || 'Unknown error'}`);
+    }
   };
 
   const merahPlayers = gameState.players.filter(p => p.tim === 'merah')
@@ -246,6 +291,18 @@ export default function LobbyPage() {
           </button>
         </div>
 
+        {/* Debug Panel */}
+        <div className="card mb-4 bg-gray-800/50">
+          <h3 className="text-lg font-bold text-white mb-2">🔧 Debug Info</h3>
+          <div className="text-xs text-gray-400 space-y-1">
+            <div>Server: https://confident-clarity-production.up.railway.app</div>
+            <div>Connection Type: {multiplayer?.getConnectionType() || 'Unknown'}</div>
+            <div>Connected: {isConnected ? 'Yes' : 'No'}</div>
+            <div>Players: {gameState.players.length}</div>
+            <div>Status: {connectionStatus}</div>
+          </div>
+        </div>
+
         {/* Game Status */}
         <div className="card mb-8">
           <div className="text-center">
@@ -269,6 +326,24 @@ export default function LobbyPage() {
               <div className="text-sm text-gray-400 mt-2">
                 Players Online: {gameState.players.length}
               </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Status: {connectionStatus}
+              </div>
+              
+              {/* Connection Retry Button */}
+              {!isConnected && multiplayer && (
+                <button
+                  onClick={() => {
+                    console.log('🔄 Manual connection retry...')
+                    multiplayer.connect().catch(error => {
+                      console.error('Failed to reconnect:', error)
+                    })
+                  }}
+                  className="mt-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm transition-colors"
+                >
+                  🔄 Retry Connection
+                </button>
+              )}
             </div>
             
             {gameState.status === 'starting' && (
