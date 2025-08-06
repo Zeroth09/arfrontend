@@ -48,6 +48,13 @@ export default function LobbyPage() {
 
   // Initialize current player and WebSocket connection
   useEffect(() => {
+    let ws: MultiplayerWebSocket | null = null;
+    
+    // Prevent multiple initializations
+    if (multiplayer) {
+      return;
+    }
+    
     const playerData = localStorage.getItem('playerData')
     if (playerData) {
       try {
@@ -65,7 +72,7 @@ export default function LobbyPage() {
         
         // Initialize WebSocket connection
         const serverUrl = 'https://confident-clarity-production.up.railway.app'
-        const ws = new MultiplayerWebSocket(serverUrl, currentPlayer.id, (message) => {
+        ws = new MultiplayerWebSocket(serverUrl, currentPlayer.id, (message) => {
           console.log('Received lobby message:', message)
           
           const lobbyMessage = message as unknown as LobbyMessage
@@ -99,11 +106,13 @@ export default function LobbyPage() {
             playerId: currentPlayer.id,
             player: currentPlayer
           });
-          ws.emit('player_join', {
-            playerId: currentPlayer.id,
-            player: currentPlayer,
-            timestamp: Date.now()
-          })
+          if (ws) {
+            ws.emit('player_join', {
+              playerId: currentPlayer.id,
+              player: currentPlayer,
+              timestamp: Date.now()
+            })
+          }
         }, 1000)
         
         // Add current player to local state
@@ -130,11 +139,12 @@ export default function LobbyPage() {
     }
     
     return () => {
-      if (multiplayer) {
-        multiplayer.disconnect()
+      // Cleanup function - disconnect when component unmounts
+      if (ws) {
+        ws.disconnect()
       }
     }
-  }, [multiplayer])
+  }, []) // Remove multiplayer dependency to prevent infinite loop
 
   // Periodic server health check
   useEffect(() => {
