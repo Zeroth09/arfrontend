@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { HumanDetection, HumanTarget } from '@/lib/humanDetection'
+import { RealHumanDetection, RealHumanTarget } from '@/lib/realHumanDetection'
 
 interface DemoState {
   status: 'waiting' | 'playing' | 'finished'
@@ -41,7 +41,7 @@ export default function DemoPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const gameIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const humanDetectionRef = useRef<HumanDetection | null>(null)
+  const realHumanDetectionRef = useRef<RealHumanDetection | null>(null)
 
   // Initialize demo game
   useEffect(() => {
@@ -114,11 +114,11 @@ export default function DemoPage() {
         videoRef.current.srcObject = stream
         setIsCameraActive(true)
         
-        // Initialize human detection after camera is ready
+        // Initialize real human detection after camera is ready
         videoRef.current.onloadedmetadata = () => {
           if (videoRef.current && canvasRef.current) {
-            humanDetectionRef.current = new HumanDetection(videoRef.current, canvasRef.current)
-            humanDetectionRef.current.startDetection()
+            realHumanDetectionRef.current = new RealHumanDetection(videoRef.current, canvasRef.current)
+            realHumanDetectionRef.current.startDetection()
           }
         }
       }
@@ -134,9 +134,9 @@ export default function DemoPage() {
       streamRef.current.getTracks().forEach(track => track.stop())
     }
     
-    // Stop human detection
-    if (humanDetectionRef.current) {
-      humanDetectionRef.current.stopDetection()
+    // Stop real human detection
+    if (realHumanDetectionRef.current) {
+      realHumanDetectionRef.current.stopDetection()
     }
   }
 
@@ -154,10 +154,10 @@ export default function DemoPage() {
     // Add shooting sound effect
     playShootSound()
     
-    // Check if hit human
-    const hitHuman = checkHumanHit()
-    if (hitHuman) {
-      handleHumanHit(hitHuman)
+    // Check if hit real human
+    const hitRealHuman = checkRealHumanHit()
+    if (hitRealHuman) {
+      handleRealHumanHit(hitRealHuman)
     }
     
     // Reset shooting state
@@ -184,15 +184,15 @@ export default function DemoPage() {
     oscillator.stop(audioContext.currentTime + 0.1)
   }
 
-  // Check if shot hits human
-  const checkHumanHit = () => {
-    if (!humanDetectionRef.current) return null
+  // Check if shot hits real human
+  const checkRealHumanHit = () => {
+    if (!realHumanDetectionRef.current) return null
     
     const screenCenter = { x: window.innerWidth / 2, y: window.innerHeight / 2 }
     const hitRadius = 50 // Hit radius in pixels
     
-    const detectedHumans = humanDetectionRef.current.getDetectedHumans()
-    return detectedHumans.find(human => {
+    const detectedRealHumans = realHumanDetectionRef.current.getDetectedRealHumans()
+    return detectedRealHumans.find(human => {
       const distance = Math.sqrt(
         Math.pow(human.position.x - screenCenter.x, 2) + 
         Math.pow(human.position.y - screenCenter.y, 2)
@@ -201,24 +201,24 @@ export default function DemoPage() {
     })
   }
 
-  // Handle human hit
-  const handleHumanHit = (human: HumanTarget) => {
+  // Handle real human hit
+  const handleRealHumanHit = (human: RealHumanTarget) => {
     // Vibrate device - short vibration for hit
     if ('vibrate' in navigator) {
       navigator.vibrate(100) // Short vibration for hit
     }
     
     // Remove human from detection
-    if (humanDetectionRef.current) {
-      humanDetectionRef.current.removeHuman(human.id)
+    if (realHumanDetectionRef.current) {
+      realHumanDetectionRef.current.removeRealHuman(human.id)
     }
     
     // Handle human elimination
-    handleHumanEliminated(human)
+    handleRealHumanEliminated(human)
   }
 
-  // Handle human elimination
-  const handleHumanEliminated = (human: HumanTarget) => {
+  // Handle real human elimination
+  const handleRealHumanEliminated = (human: RealHumanTarget) => {
     setDemoState(prev => ({
       ...prev,
       currentPlayer: {
@@ -408,14 +408,14 @@ export default function DemoPage() {
           </div>
         </div>
         
-                 {/* Humans Info */}
+                 {/* Real Humans Info */}
          <div className="absolute top-20 left-4 bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white">
            <div className="text-lg font-bold">
-             {humanDetectionRef.current ? humanDetectionRef.current.getDetectedHumans().length : 0}
+             {realHumanDetectionRef.current ? realHumanDetectionRef.current.getDetectedRealHumans().length : 0}
            </div>
-           <div className="text-sm">Humans Detected</div>
+           <div className="text-sm">Real Humans Detected</div>
            <div className="text-xs text-gray-300 mt-1">
-             Max Range: 400m
+             Face & Body Detection
            </div>
          </div>
 
