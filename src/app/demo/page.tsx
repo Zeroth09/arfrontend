@@ -406,93 +406,93 @@ export default function DemoPage() {
         </div>
       </div>
       
-      {/* Game UI */}
-      <div className="absolute inset-0 z-10">
-        {/* Top Bar - Time and Health */}
-        <div className="absolute top-4 left-20 right-4 flex justify-between items-center">
-          <div className="bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white">
-            <div className="text-2xl font-bold">{formatTime(demoState.timeLeft)}</div>
-            <div className="text-sm">Time Remaining</div>
+      {/* Game UI - Responsive Layout */}
+      <div className="absolute inset-0 z-10 flex flex-col justify-between p-2 sm:p-4">
+        {/* Top Section - Time, Health, Score */}
+        <div className="flex justify-between items-center">
+          {/* Time */}
+          <div className="bg-black/50 backdrop-blur-sm rounded-lg px-2 py-1 sm:px-4 sm:py-2 text-white">
+            <div className="text-lg sm:text-2xl font-bold">{formatTime(demoState.timeLeft)}</div>
+            <div className="text-xs sm:text-sm">Time</div>
           </div>
           
-          <div className="bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white">
-            <div className="text-2xl font-bold text-red-400">
+          {/* Health */}
+          <div className="bg-black/50 backdrop-blur-sm rounded-lg px-2 py-1 sm:px-4 sm:py-2 text-white">
+            <div className="text-lg sm:text-2xl font-bold text-red-400">
               {'❤️'.repeat(demoState.currentPlayer.health)}
             </div>
-            <div className="text-sm">Health</div>
+            <div className="text-xs sm:text-sm">Health</div>
           </div>
           
-          <div className="bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white">
-            <div className="text-2xl font-bold text-green-400">
-              {demoState.currentPlayer.kills} Kills
+          {/* Score */}
+          <div className="bg-black/50 backdrop-blur-sm rounded-lg px-2 py-1 sm:px-4 sm:py-2 text-white">
+            <div className="text-lg sm:text-2xl font-bold text-green-400">
+              {demoState.currentPlayer.kills}
             </div>
-            <div className="text-sm">Score</div>
+            <div className="text-xs sm:text-sm">Kills</div>
           </div>
         </div>
         
-        {/* Crosshair */}
-        <div 
-          className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 pointer-events-none"
-          style={{
-            background: 'radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.3) 50%, transparent 100%)',
-            borderRadius: '50%'
-          }}
-        />
-        
-        {/* Shoot Button */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
-          <button
-            onClick={handleShoot}
-            disabled={isShooting}
-            className={`
-              w-24 h-24 rounded-full border-4 border-white/50 
-              ${isShooting 
-                ? 'bg-red-600 scale-95' 
-                : 'bg-red-500 hover:bg-red-600 hover:scale-105'
-              }
-              transition-all duration-100 ease-out
-              shadow-2xl
-            `}
-          >
-            <div className="text-white text-2xl font-bold">🎯</div>
-          </button>
+        {/* Center Section - Crosshair */}
+        <div className="flex-1 flex items-center justify-center relative">
+          {/* Crosshair */}
+          <div 
+            className="w-6 h-6 sm:w-8 sm:h-8 pointer-events-none"
+            style={{
+              background: 'radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.3) 50%, transparent 100%)',
+              borderRadius: '50%'
+            }}
+          />
         </div>
         
-        {/* Player Info */}
-        <div className="absolute bottom-8 right-4 bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white">
-          <div className="text-lg font-bold">{demoState.currentPlayer.nama}</div>
-          <div className="text-sm">
-            Team: {demoState.currentPlayer.tim === 'merah' ? '🔴 Merah' : '⚪ Putih'}
+        {/* Bottom Section - Shoot Button and Info */}
+        <div className="flex justify-between items-end">
+          {/* Shoot Button */}
+          <div className="flex-1 flex justify-center">
+            <button
+              onClick={handleShoot}
+              disabled={isShooting}
+              className={`
+                w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 rounded-full border-4 border-white/50 
+                ${isShooting 
+                  ? 'bg-red-600 scale-95' 
+                  : 'bg-red-500 hover:bg-red-600 hover:scale-105'
+                }
+                transition-all duration-100 ease-out
+                shadow-2xl
+              `}
+            >
+              <div className="text-white text-lg sm:text-xl lg:text-2xl font-bold">🎯</div>
+            </button>
           </div>
-          <div className="text-xs text-yellow-300 mt-1">
-            Demo: Red vs White Battle
+          
+          {/* Player Info */}
+          <div className="bg-black/50 backdrop-blur-sm rounded-lg px-2 py-1 sm:px-4 sm:py-2 text-white">
+            <div className="text-sm sm:text-lg font-bold">{demoState.currentPlayer.nama}</div>
+            <div className="text-xs sm:text-sm">
+              {demoState.currentPlayer.tim === 'merah' ? '🔴 Merah' : '⚪ Putih'}
+            </div>
+            <div className="text-xs text-yellow-300 mt-1">
+              Red vs White
+            </div>
           </div>
         </div>
         
-                 {/* Detection Status */}
-         <div className="absolute top-20 left-4 bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white">
-           <div className="text-lg font-bold">
-             {multiplayerTargetDetectionRef.current && multiplayerTargetDetectionRef.current.getDetectedTargets().length > 0 ? '🎯' : '📷'}
-           </div>
-           <div className="text-sm">
-             {multiplayerTargetDetectionRef.current && multiplayerTargetDetectionRef.current.getDetectedTargets().length > 0 ? 'Enemy Detected' : 'Scanning Area...'}
-           </div>
-           <div className="text-xs text-gray-300 mt-1">
-             {multiplayerTargetDetectionRef.current && multiplayerTargetDetectionRef.current.getDetectedTargets().length > 0 
-               ? `GPS + Human Verified` 
-               : 'GPS + Human Detection'
-             }
-           </div>
-         </div>
+        {/* Detection Status - Top Left */}
+        <div className="absolute top-16 left-2 sm:left-4 bg-black/50 backdrop-blur-sm rounded-lg px-2 py-1 sm:px-4 sm:py-2 text-white">
+          <div className="text-sm sm:text-lg font-bold">
+            {multiplayerTargetDetectionRef.current && multiplayerTargetDetectionRef.current.getDetectedTargets().length > 0 ? '🎯' : '📷'}
+          </div>
+          <div className="text-xs sm:text-sm">
+            {multiplayerTargetDetectionRef.current && multiplayerTargetDetectionRef.current.getDetectedTargets().length > 0 ? 'Enemy' : 'Scanning'}
+          </div>
+        </div>
 
-        {/* Demo Info */}
-        <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white">
-          <div className="text-sm text-yellow-400 font-bold">🎮 Demo Mode</div>
+        {/* Demo Info - Top Right */}
+        <div className="absolute top-2 right-2 sm:top-4 sm:right-4 bg-black/50 backdrop-blur-sm rounded-lg px-2 py-1 sm:px-4 sm:py-2 text-white">
+          <div className="text-xs sm:text-sm text-yellow-400 font-bold">🎮 Demo</div>
           <div className="text-xs text-gray-300">
-            Red vs White Battle Test
-          </div>
-          <div className="text-xs text-blue-300 mt-1">
-            Team switches every 30s
+            Red vs White
           </div>
         </div>
       </div>
@@ -500,10 +500,10 @@ export default function DemoPage() {
       {/* Loading Screen */}
       {!isCameraActive && (
         <div className="absolute inset-0 bg-black flex items-center justify-center z-20">
-          <div className="text-center text-white">
-            <div className="text-4xl mb-4">📷</div>
-            <div className="text-xl">Initializing Camera...</div>
-            <div className="text-sm mt-2">Please allow camera access</div>
+          <div className="text-center text-white px-4">
+            <div className="text-3xl sm:text-4xl mb-4">📷</div>
+            <div className="text-lg sm:text-xl">Initializing Camera...</div>
+            <div className="text-xs sm:text-sm mt-2">Please allow camera access</div>
           </div>
         </div>
       )}
