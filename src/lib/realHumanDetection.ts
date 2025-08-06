@@ -152,9 +152,12 @@ export class RealHumanDetection {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const faces = await (this.faceDetectionModel as any).detect(this.videoElement)
       
-      faces.forEach((face: any, index: number) => {
-        const { boundingBox } = face
-        const confidence = face.score || 0.8
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        faces.forEach((face: any, index: number) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { boundingBox } = face as any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const confidence = (face as any).score || 0.8
         
         if (confidence > 0.5) {
           this.addRealHuman({
@@ -198,9 +201,12 @@ export class RealHumanDetection {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const poses = await (this.bodyDetectionModel as any).detect(this.videoElement)
       
-      poses.forEach((pose: any, index: number) => {
-        const { keypoints } = pose
-        const confidence = pose.score || 0.7
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        poses.forEach((pose: any, index: number) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { keypoints } = pose as any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const confidence = (pose as any).score || 0.7
         
         if (confidence > 0.5 && keypoints.length > 0) {
           // Calculate body center from keypoints
@@ -345,13 +351,13 @@ export class RealHumanDetection {
   }
 
   // Detect movement from bounding box
-  private detectMovement(boundingBox: unknown): boolean {
+  private detectMovement(_boundingBox: unknown): boolean {
     // Simulate movement detection
     return Math.random() > 0.6
   }
 
   // Detect body movement from keypoints
-  private detectBodyMovement(keypoints: unknown[]): boolean {
+  private detectBodyMovement(_keypoints: unknown[]): boolean {
     // Simulate body movement detection
     return Math.random() > 0.5
   }
@@ -398,6 +404,7 @@ export class RealHumanDetection {
     
     const { x, y, width, height } = human.boundingBox
     const centerX = x + width/2
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const centerY = y + height/2
     
     // Draw human silhouette with different colors based on detection method

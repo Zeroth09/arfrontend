@@ -218,6 +218,7 @@ export default function DemoPage() {
   }
 
   // Handle real human elimination
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleRealHumanEliminated = (_human: RealHumanTarget) => {
     setDemoState(prev => ({
       ...prev,
