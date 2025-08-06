@@ -227,21 +227,19 @@ export default function DemoPage() {
     oscillator.stop(audioContext.currentTime + 0.1)
   }
 
-  // Check if shot hits real human
+  // Check if shot hits real human - INVISIBLE TARGETS
   const checkRealHumanHit = () => {
     if (!realHumanDetectionRef.current) return null
     
-    const screenCenter = { x: window.innerWidth / 2, y: window.innerHeight / 2 }
-    const hitRadius = 50 // Hit radius in pixels
-    
     const detectedRealHumans = realHumanDetectionRef.current.getDetectedRealHumans()
-    return detectedRealHumans.find(human => {
-      const distance = Math.sqrt(
-        Math.pow(human.position.x - screenCenter.x, 2) + 
-        Math.pow(human.position.y - screenCenter.y, 2)
-      )
-      return distance < hitRadius
-    })
+    
+    // If any humans are detected, consider it a hit (simplified for clean interface)
+    if (detectedRealHumans.length > 0) {
+      // Return the first detected human as hit
+      return detectedRealHumans[0]
+    }
+    
+    return null
   }
 
   // Handle real human hit
@@ -385,18 +383,7 @@ export default function DemoPage() {
         className="absolute inset-0 w-full h-full pointer-events-none"
       />
       
-      {/* No Targets Message */}
-      {realHumanDetectionRef.current && realHumanDetectionRef.current.getDetectedRealHumans().length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center z-30">
-          <div className="bg-black/70 backdrop-blur-sm rounded-lg px-6 py-4 text-white text-center">
-            <div className="text-2xl mb-2">📷</div>
-            <div className="text-lg font-bold mb-2">Point Camera at People</div>
-            <div className="text-sm text-gray-300">
-              Real human detection will appear when you point camera at actual people
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Clean Interface - No Visual Targets */}
       
       {/* Demo Badge */}
       <div className="absolute top-4 left-4 z-20">
@@ -465,14 +452,16 @@ export default function DemoPage() {
           </div>
         </div>
         
-                 {/* Real Humans Info */}
+                 {/* Detection Status */}
          <div className="absolute top-20 left-4 bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white">
            <div className="text-lg font-bold">
-             {realHumanDetectionRef.current ? realHumanDetectionRef.current.getDetectedRealHumans().length : 0}
+             {realHumanDetectionRef.current && realHumanDetectionRef.current.getDetectedRealHumans().length > 0 ? '🎯' : '📷'}
            </div>
-           <div className="text-sm">Real Humans Detected</div>
+           <div className="text-sm">
+             {realHumanDetectionRef.current && realHumanDetectionRef.current.getDetectedRealHumans().length > 0 ? 'Target Acquired' : 'No Target'}
+           </div>
            <div className="text-xs text-gray-300 mt-1">
-             Camera Detection Only
+             Invisible Detection
            </div>
          </div>
 

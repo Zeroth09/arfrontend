@@ -478,17 +478,15 @@ export class RealHumanDetection {
     })
   }
 
-  // Draw real humans on canvas
+  // Draw real humans on canvas - DISABLED for clean interface
   private drawRealHumans() {
     if (!this.ctx || !this.canvasElement) return
     
-    // Clear canvas
+    // Clear canvas - keep it clean
     this.ctx.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height)
     
-    // Draw each human
-    this.humans.forEach(human => {
-      this.drawRealHuman(human)
-    })
+    // Don't draw any visual targets - keep interface clean
+    // Humans are still detected but not visually displayed
   }
 
   // Draw individual real human
