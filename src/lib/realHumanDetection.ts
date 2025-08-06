@@ -244,12 +244,13 @@ export class RealHumanDetection {
     const videoWidth = this.videoElement!.videoWidth || window.innerWidth
     const videoHeight = this.videoElement!.videoHeight || window.innerHeight
     
-    // Simulate detection based on device motion
+    // Simulate detection based on device motion - REDUCED FREQUENCY
     if ('DeviceMotionEvent' in window) {
-      const motionThreshold = 1.5
+      const motionThreshold = 2.5 // Increased threshold
       const motionMagnitude = this.getDeviceMotionMagnitude()
       
-      if (motionMagnitude > motionThreshold) {
+      // Only generate humans occasionally (10% chance)
+      if (motionMagnitude > motionThreshold && Math.random() < 0.1) {
         this.generateSimulatedRealHuman(videoWidth, videoHeight, motionMagnitude)
       }
     }
@@ -264,26 +265,31 @@ export class RealHumanDetection {
 
   // Generate simulated real human
   private generateSimulatedRealHuman(videoWidth: number, videoHeight: number, confidence: number) {
-    const x = Math.random() * videoWidth
-    const y = Math.random() * videoHeight
-    const distance = Math.random() * 200 + 50 // 50-250m
+    // Generate only 1-2 humans at a time
+    const numHumans = Math.floor(Math.random() * 2) + 1
     
-    this.addRealHuman({
-      id: `sim_${Date.now()}`,
-      position: { x, y, z: distance },
-      distance,
-      confidence: Math.min(0.9, confidence * 0.3),
-      isMoving: Math.random() > 0.5,
-      faceDetected: Math.random() > 0.7,
-      boundingBox: {
-        x: x - 25,
-        y: y - 50,
-        width: 50,
-        height: 100
-      },
-      lastSeen: Date.now(),
-      detectionMethod: 'motion'
-    })
+    for (let i = 0; i < numHumans; i++) {
+      const x = Math.random() * videoWidth
+      const y = Math.random() * videoHeight
+      const distance = Math.random() * 150 + 100 // 100-250m
+      
+      this.addRealHuman({
+        id: `sim_${Date.now()}_${i}`,
+        position: { x, y, z: distance },
+        distance,
+        confidence: Math.min(0.8, confidence * 0.2), // Lower confidence
+        isMoving: Math.random() > 0.7, // Less movement
+        faceDetected: Math.random() > 0.8, // Higher face detection threshold
+        boundingBox: {
+          x: x - 25,
+          y: y - 50,
+          width: 50,
+          height: 100
+        },
+        lastSeen: Date.now(),
+        detectionMethod: 'motion'
+      })
+    }
   }
 
   // Add real human to detection list
@@ -367,16 +373,16 @@ export class RealHumanDetection {
   // Update existing humans
   private updateExistingHumans(deltaTime: number) {
     this.humans = this.humans.filter(human => {
-      // Remove humans that haven't been seen for 15 seconds
-      if (Date.now() - human.lastSeen > 15000) {
+      // Remove humans that haven't been seen for 8 seconds (shorter lifespan)
+      if (Date.now() - human.lastSeen > 8000) {
         return false
       }
       
-      // Update human movement
+      // Update human movement - slower movement
       if (human.isMoving) {
-        const moveDistance = 1 * (deltaTime / 1000) // 1 m/s
-        human.position.x += (Math.random() - 0.5) * moveDistance * 10
-        human.position.y += (Math.random() - 0.5) * moveDistance * 10
+        const moveDistance = 0.5 * (deltaTime / 1000) // 0.5 m/s (slower)
+        human.position.x += (Math.random() - 0.5) * moveDistance * 5
+        human.position.y += (Math.random() - 0.5) * moveDistance * 5
         
         // Update bounding box
         human.boundingBox.x = human.position.x - 25
@@ -481,7 +487,9 @@ export class RealHumanDetection {
 
   // Get all detected real humans
   getDetectedRealHumans(): RealHumanTarget[] {
-    return this.humans.filter(human => human.confidence > 0.3)
+    // Filter by confidence and limit to max 5 humans
+    const filteredHumans = this.humans.filter(human => human.confidence > 0.4)
+    return filteredHumans.slice(0, 5) // Max 5 humans
   }
 
   // Get human by ID
