@@ -133,9 +133,10 @@ export class RealHumanDetection {
         await this.detectBodies()
       }
 
-      // Fallback to simulated detection if models not available
+      // Only use real detection models
       if (!this.faceDetectionModel && !this.bodyDetectionModel) {
-        this.simulateRealDetection()
+        console.log('📷 No detection models available - using camera only')
+        // Don't generate any simulated targets
       }
 
     } catch (error) {
@@ -241,19 +242,9 @@ export class RealHumanDetection {
 
   // Simulate real detection when models are not available
   private simulateRealDetection() {
-    const videoWidth = this.videoElement!.videoWidth || window.innerWidth
-    const videoHeight = this.videoElement!.videoHeight || window.innerHeight
-    
-    // Simulate detection based on device motion - REDUCED FREQUENCY
-    if ('DeviceMotionEvent' in window) {
-      const motionThreshold = 2.5 // Increased threshold
-      const motionMagnitude = this.getDeviceMotionMagnitude()
-      
-      // Only generate humans occasionally (10% chance)
-      if (motionMagnitude > motionThreshold && Math.random() < 0.1) {
-        this.generateSimulatedRealHuman(videoWidth, videoHeight, motionMagnitude)
-      }
-    }
+    // DISABLED: No more simulated red targets
+    // Only use real camera detection
+    return
   }
 
   // Get device motion magnitude

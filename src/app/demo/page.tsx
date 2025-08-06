@@ -385,6 +385,19 @@ export default function DemoPage() {
         className="absolute inset-0 w-full h-full pointer-events-none"
       />
       
+      {/* No Targets Message */}
+      {realHumanDetectionRef.current && realHumanDetectionRef.current.getDetectedRealHumans().length === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center z-30">
+          <div className="bg-black/70 backdrop-blur-sm rounded-lg px-6 py-4 text-white text-center">
+            <div className="text-2xl mb-2">📷</div>
+            <div className="text-lg font-bold mb-2">Point Camera at People</div>
+            <div className="text-sm text-gray-300">
+              Real human detection will appear when you point camera at actual people
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Demo Badge */}
       <div className="absolute top-4 left-4 z-20">
         <div className="bg-yellow-500/80 backdrop-blur-sm rounded-lg px-3 py-1 text-black font-bold text-sm">
@@ -459,7 +472,7 @@ export default function DemoPage() {
            </div>
            <div className="text-sm">Real Humans Detected</div>
            <div className="text-xs text-gray-300 mt-1">
-             Face & Body Detection
+             Camera Detection Only
            </div>
          </div>
 
