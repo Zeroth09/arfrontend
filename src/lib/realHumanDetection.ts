@@ -324,7 +324,7 @@ export class RealHumanDetection {
   // Calculate body center from keypoints
   private calculateBodyCenter(keypoints: unknown[]): { x: number; y: number } {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const validPoints = keypoints.filter((kp: any) => kp.score > 0.5)
+    const validPoints = keypoints.filter((kp: any) => kp.score > 0.5) as any[]
     if (validPoints.length === 0) return { x: 0, y: 0 }
     
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -338,7 +338,7 @@ export class RealHumanDetection {
   // Calculate keypoint spread
   private calculateKeypointSpread(keypoints: unknown[]): number {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const validPoints = keypoints.filter((kp: any) => kp.score > 0.5)
+    const validPoints = keypoints.filter((kp: any) => kp.score > 0.5) as any[]
     if (validPoints.length < 2) return 0
     
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
