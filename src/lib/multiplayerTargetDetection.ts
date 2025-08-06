@@ -182,10 +182,11 @@ export class MultiplayerTargetDetection {
     const imageData = ctx.getImageData(0, 0, videoWidth, videoHeight)
     const data = imageData.data
     
-    // Basic skin tone detection
+    // Basic skin tone detection - REDUCED SENSITIVITY
     const skinTonePixels = this.detectSkinTones(data, videoWidth, videoHeight)
     
-    if (skinTonePixels.length > 0) {
+    // Only detect humans occasionally (20% chance)
+    if (skinTonePixels.length > 0 && Math.random() < 0.2) {
       this.addHumanTarget(skinTonePixels, videoWidth, videoHeight)
     }
   }
@@ -215,22 +216,26 @@ export class MultiplayerTargetDetection {
   private getNearbyPlayers() {
     if (!this.currentPlayerLocation) return []
     
-    // Simulate nearby players
+    // Simulate nearby players - REDUCED FREQUENCY
     const nearbyPlayers = []
-    const numPlayers = Math.floor(Math.random() * 3) + 1 // 1-3 players
+    const hasNearbyPlayers = Math.random() < 0.3 // Only 30% chance to have nearby players
     
-    for (let i = 0; i < numPlayers; i++) {
-      const offsetLat = (Math.random() - 0.5) * 0.001 // ~100m
-      const offsetLng = (Math.random() - 0.5) * 0.001 // ~100m
+    if (hasNearbyPlayers) {
+      const numPlayers = Math.floor(Math.random() * 2) + 1 // 1-2 players
       
-      nearbyPlayers.push({
-        id: `player_${Date.now()}_${i}`,
-        nama: `Player ${i + 1}`,
-        tim: Math.random() > 0.5 ? 'merah' : 'putih',
-        latitude: this.currentPlayerLocation.latitude + offsetLat,
-        longitude: this.currentPlayerLocation.longitude + offsetLng,
-        health: 100
-      })
+      for (let i = 0; i < numPlayers; i++) {
+        const offsetLat = (Math.random() - 0.5) * 0.001 // ~100m
+        const offsetLng = (Math.random() - 0.5) * 0.001 // ~100m
+        
+        nearbyPlayers.push({
+          id: `player_${Date.now()}_${i}`,
+          nama: `Player ${i + 1}`,
+          tim: Math.random() > 0.5 ? 'merah' : 'putih',
+          latitude: this.currentPlayerLocation.latitude + offsetLat,
+          longitude: this.currentPlayerLocation.longitude + offsetLng,
+          health: 100
+        })
+      }
     }
     
     return nearbyPlayers
@@ -380,7 +385,24 @@ export class MultiplayerTargetDetection {
 
   // Get all detected multiplayer targets
   getDetectedTargets(): MultiplayerTarget[] {
-    return this.targets.filter(target => target.confidence > 0.4)
+    // Only return targets with high confidence and recent detection
+    const detectedTargets = this.targets.filter(target => 
+      target.confidence > 0.6 && 
+      Date.now() - target.lastSeen < 5000 // Only targets seen in last 5 seconds
+    )
+    
+    console.log('🎯 Detection Stats:', {
+      totalTargets: this.targets.length,
+      detectedTargets: detectedTargets.length,
+      targets: this.targets.map(t => ({
+        id: t.id,
+        confidence: t.confidence,
+        lastSeen: Date.now() - t.lastSeen,
+        method: t.detectionMethod
+      }))
+    })
+    
+    return detectedTargets
   }
 
   // Get target by ID
