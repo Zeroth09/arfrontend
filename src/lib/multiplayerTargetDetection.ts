@@ -128,10 +128,16 @@ export class MultiplayerTargetDetection {
     if (!this.videoElement) return
 
     try {
-      // Combine GPS-based and human detection
+      // ONLY detect targets that have BOTH GPS location AND human detection
       this.detectGPSTargets()
       this.detectHumanTargets()
       this.combineDetections()
+      
+      // Remove targets that don't have both GPS and human detection
+      this.targets = this.targets.filter(target => 
+        target.detectionMethod === 'combined' || 
+        (target.detectionMethod === 'gps' && this.hasHumanDetectionNearby(target))
+      )
     } catch (error) {
       console.error('Detection error:', error)
     }
@@ -153,8 +159,8 @@ export class MultiplayerTargetDetection {
         player.longitude
       )
 
-      // Only show players within 500m
-      if (distance <= 500) {
+      // Only show players within 200m (more realistic)
+      if (distance <= 200) {
         this.addGPSTarget(player, distance)
       }
     })
@@ -182,11 +188,11 @@ export class MultiplayerTargetDetection {
     const imageData = ctx.getImageData(0, 0, videoWidth, videoHeight)
     const data = imageData.data
     
-    // Basic skin tone detection - REDUCED SENSITIVITY
+    // Basic skin tone detection - VERY RARE
     const skinTonePixels = this.detectSkinTones(data, videoWidth, videoHeight)
     
-    // Only detect humans occasionally (20% chance)
-    if (skinTonePixels.length > 0 && Math.random() < 0.2) {
+    // Only detect humans very rarely (5% chance)
+    if (skinTonePixels.length > 0 && Math.random() < 0.05) {
       this.addHumanTarget(skinTonePixels, videoWidth, videoHeight)
     }
   }
@@ -211,21 +217,30 @@ export class MultiplayerTargetDetection {
       }
     })
   }
+  
+  // Check if GPS target has human detection nearby
+  private hasHumanDetectionNearby(gpsTarget: MultiplayerTarget): boolean {
+    return this.targets.some(target => 
+      target.detectionMethod === 'human' &&
+      Math.abs(target.position.x - gpsTarget.position.x) < 50 &&
+      Math.abs(target.position.y - gpsTarget.position.y) < 50
+    )
+  }
 
   // Get nearby players (simulated for demo)
   private getNearbyPlayers() {
     if (!this.currentPlayerLocation) return []
     
-    // Simulate nearby players - REDUCED FREQUENCY
+    // Simulate nearby players - VERY RARE
     const nearbyPlayers = []
-    const hasNearbyPlayers = Math.random() < 0.3 // Only 30% chance to have nearby players
+    const hasNearbyPlayers = Math.random() < 0.1 // Only 10% chance to have nearby players
     
     if (hasNearbyPlayers) {
-      const numPlayers = Math.floor(Math.random() * 2) + 1 // 1-2 players
+      const numPlayers = 1 // Only 1 player at a time
       
       for (let i = 0; i < numPlayers; i++) {
-        const offsetLat = (Math.random() - 0.5) * 0.001 // ~100m
-        const offsetLng = (Math.random() - 0.5) * 0.001 // ~100m
+        const offsetLat = (Math.random() - 0.5) * 0.0005 // ~50m
+        const offsetLng = (Math.random() - 0.5) * 0.0005 // ~50m
         
         nearbyPlayers.push({
           id: `player_${Date.now()}_${i}`,

@@ -458,11 +458,11 @@ export default function DemoPage() {
              {multiplayerTargetDetectionRef.current && multiplayerTargetDetectionRef.current.getDetectedTargets().length > 0 ? '🎯' : '📷'}
            </div>
            <div className="text-sm">
-             {multiplayerTargetDetectionRef.current && multiplayerTargetDetectionRef.current.getDetectedTargets().length > 0 ? 'Target Acquired' : 'Scanning...'}
+             {multiplayerTargetDetectionRef.current && multiplayerTargetDetectionRef.current.getDetectedTargets().length > 0 ? 'Enemy Detected' : 'Scanning Area...'}
            </div>
            <div className="text-xs text-gray-300 mt-1">
              {multiplayerTargetDetectionRef.current && multiplayerTargetDetectionRef.current.getDetectedTargets().length > 0 
-               ? `${multiplayerTargetDetectionRef.current.getDetectedTargets().length} Target(s)` 
+               ? `GPS + Human Verified` 
                : 'GPS + Human Detection'
              }
            </div>
