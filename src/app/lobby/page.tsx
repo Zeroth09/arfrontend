@@ -100,6 +100,26 @@ export default function LobbyPage() {
         setIsConnected(true)
         setConnectionStatus('Connecting...')
         
+        // Request current players list after connection
+        setTimeout(async () => {
+          try {
+            const response = await fetch('https://confident-clarity-production.up.railway.app/api/current-players')
+            if (response.ok) {
+              const data = await response.json()
+              console.log('📋 Received current players from server:', data)
+              if (data.data && data.data.players) {
+                handleCurrentPlayers({
+                  type: 'current_players',
+                  data: { players: data.data.players },
+                  timestamp: Date.now()
+                })
+              }
+            }
+          } catch (error) {
+            console.error('❌ Failed to fetch current players:', error)
+          }
+        }, 2000)
+        
         // Send player join message after connection is established
         setTimeout(() => {
           console.log('📤 Sending player_join event:', {
