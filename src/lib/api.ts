@@ -3,7 +3,7 @@ import { ApiResponse, LoginRequest, RegisterRequest, AuthResponse, GameRoom, Use
 const API_BASE_URL = 'https://confident-clarity-production.up.railway.app'
 
 // Test API connection
-export const testApiConnection = async (): Promise<ApiResponse<any>> => {
+export const testApiConnection = async (): Promise<ApiResponse<Record<string, unknown>>> => {
   try {
     const response = await fetch(`${API_BASE_URL}/`, {
       method: 'GET',
@@ -20,12 +20,12 @@ export const testApiConnection = async (): Promise<ApiResponse<any>> => {
     return { success: true, data }
   } catch (error) {
     console.error('API connection test failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    return { success: false, data: null, error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }
 
 // HTTP API methods as fallback for WebSocket
-export const joinPlayerHttp = async (playerId: string, player: any): Promise<ApiResponse<any>> => {
+export const joinPlayerHttp = async (playerId: string, player: Record<string, unknown>): Promise<ApiResponse<Record<string, unknown>>> => {
   try {
     const response = await fetch(`${API_BASE_URL}/api/player/join`, {
       method: 'POST',
@@ -43,11 +43,11 @@ export const joinPlayerHttp = async (playerId: string, player: any): Promise<Api
     return { success: true, data }
   } catch (error) {
     console.error('HTTP join player failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    return { success: false, data: null, error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }
 
-export const getPlayersHttp = async (): Promise<ApiResponse<any>> => {
+export const getPlayersHttp = async (): Promise<ApiResponse<Record<string, unknown>>> => {
   try {
     const response = await fetch(`${API_BASE_URL}/api/players`, {
       method: 'GET',
@@ -64,11 +64,11 @@ export const getPlayersHttp = async (): Promise<ApiResponse<any>> => {
     return { success: true, data }
   } catch (error) {
     console.error('HTTP get players failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    return { success: false, data: null, error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }
 
-export const leavePlayerHttp = async (playerId: string): Promise<ApiResponse<any>> => {
+export const leavePlayerHttp = async (playerId: string): Promise<ApiResponse<Record<string, unknown>>> => {
   try {
     const response = await fetch(`${API_BASE_URL}/api/player/leave`, {
       method: 'POST',
@@ -86,7 +86,7 @@ export const leavePlayerHttp = async (playerId: string): Promise<ApiResponse<any
     return { success: true, data }
   } catch (error) {
     console.error('HTTP leave player failed:', error)
-    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    return { success: false, data: null, error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }
 

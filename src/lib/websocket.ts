@@ -1,38 +1,18 @@
 import { io, Socket } from 'socket.io-client'
 
-export interface GameMessage {
-  type: 'player_join' | 'player_leave' | 'position_update' | 'shoot' | 'hit' | 'elimination' | 'game_state' | 'current_players'
-  playerId: string
-  data: Record<string, unknown>
-  timestamp: number
-}
-
-export interface PlayerData {
-  id: string
-  nama: string
-  tim: 'merah' | 'putih'
-  position: { x: number; y: number }
-  gps: { lat: number; lng: number }
-  isAlive: boolean
-  health: number
-  kills: number
-  deaths: number
-  lastSeen: Date
-}
-
 export class MultiplayerWebSocket {
   private socket: Socket | null = null
   private eventSource: EventSource | null = null
   private serverUrl: string
   private playerId: string
-  private onMessageCallback: (message: any) => void
+  private onMessageCallback: (message: Record<string, unknown>) => void
   private reconnectAttempts = 0
   private maxReconnectAttempts = 5
   private reconnectDelay = 2000
   private isConnected = false
   private useSSE = false
 
-  constructor(serverUrl: string, playerId: string, onMessage: (message: any) => void) {
+  constructor(serverUrl: string, playerId: string, onMessage: (message: Record<string, unknown>) => void) {
     this.serverUrl = serverUrl
     this.playerId = playerId
     this.onMessageCallback = onMessage
@@ -91,22 +71,22 @@ export class MultiplayerWebSocket {
         }
       })
 
-      this.socket.on('player_join', (data) => {
+      this.socket.on('player_join', (data: Record<string, unknown>) => {
         console.log('📥 Received player_join via WebSocket:', data)
         this.onMessageCallback(data)
       })
 
-      this.socket.on('player_leave', (data) => {
+      this.socket.on('player_leave', (data: Record<string, unknown>) => {
         console.log('📥 Received player_leave via WebSocket:', data)
         this.onMessageCallback(data)
       })
 
-      this.socket.on('current_players', (data) => {
+      this.socket.on('current_players', (data: Record<string, unknown>) => {
         console.log('📥 Received current_players via WebSocket:', data)
         this.onMessageCallback(data)
       })
 
-      this.socket.on('serverStatus', (data) => {
+      this.socket.on('serverStatus', (data: Record<string, unknown>) => {
         console.log('📥 Received serverStatus via WebSocket:', data)
         this.onMessageCallback(data)
       })
@@ -136,7 +116,7 @@ export class MultiplayerWebSocket {
 
       this.eventSource.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data)
+          const data = JSON.parse(event.data) as Record<string, unknown>
           console.log('📥 Received SSE event:', data)
           this.onMessageCallback(data)
         } catch (error) {
