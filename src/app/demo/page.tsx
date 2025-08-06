@@ -104,28 +104,71 @@ export default function DemoPage() {
   // Initialize camera and AR
   const initializeCamera = async () => {
     try {
+      console.log('🔍 Initializing camera...')
+      
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
         audio: false
       })
       
+      console.log('✅ Camera stream obtained:', stream)
       streamRef.current = stream
+      
       if (videoRef.current) {
         videoRef.current.srcObject = stream
+        videoRef.current.play() // Ensure video plays
         setIsCameraActive(true)
+        
+        console.log('📹 Video element configured')
         
         // Initialize real human detection after camera is ready
         videoRef.current.onloadedmetadata = () => {
+          console.log('🎬 Video metadata loaded')
           if (videoRef.current && canvasRef.current) {
+            console.log('🤖 Initializing real human detection...')
             realHumanDetectionRef.current = new RealHumanDetection(videoRef.current, canvasRef.current)
             realHumanDetectionRef.current.startDetection()
+            console.log('✅ Real human detection started')
           }
+        }
+        
+        // Also initialize on canplay event
+        videoRef.current.oncanplay = () => {
+          console.log('▶️ Video can play')
+          if (videoRef.current && canvasRef.current && !realHumanDetectionRef.current) {
+            console.log('🤖 Initializing real human detection (canplay)...')
+            realHumanDetectionRef.current = new RealHumanDetection(videoRef.current, canvasRef.current)
+            realHumanDetectionRef.current.startDetection()
+            console.log('✅ Real human detection started (canplay)')
+          }
+        }
+        
+        // Error handling
+        videoRef.current.onerror = (error) => {
+          console.error('❌ Video error:', error)
         }
       }
     } catch (error) {
-      console.error('Camera access denied:', error)
-      // Fallback to demo mode
+      console.error('❌ Camera access denied:', error)
+      // Fallback to demo mode without camera
       setIsCameraActive(true)
+      console.log('🔄 Using fallback mode without camera')
+      
+      // Initialize detection without camera
+      if (canvasRef.current) {
+        console.log('🤖 Initializing detection without camera...')
+        // Create a dummy video element for detection
+        const dummyVideo = document.createElement('video')
+        dummyVideo.width = window.innerWidth
+        dummyVideo.height = window.innerHeight
+        realHumanDetectionRef.current = new RealHumanDetection(dummyVideo, canvasRef.current)
+        realHumanDetectionRef.current.startDetection()
+        console.log('✅ Detection started in fallback mode')
+      }
     }
   }
 
