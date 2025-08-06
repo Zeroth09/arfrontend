@@ -100,18 +100,30 @@ export default function LobbyPage() {
         setIsConnected(true)
         setConnectionStatus('Connecting...')
         
-        // Send player join message
+        // Send player join message after connection is established
         setTimeout(() => {
           console.log('📤 Sending player_join event:', {
             playerId: currentPlayer.id,
             player: currentPlayer
           });
-          if (ws) {
+          if (ws && ws.isConnectedToServer()) {
             ws.emit('player_join', {
               playerId: currentPlayer.id,
               player: currentPlayer,
               timestamp: Date.now()
             })
+          } else {
+            console.log('⚠️ WebSocket not connected yet, will retry...');
+            // Retry after 2 seconds if not connected
+            setTimeout(() => {
+              if (ws && ws.isConnectedToServer()) {
+                ws.emit('player_join', {
+                  playerId: currentPlayer.id,
+                  player: currentPlayer,
+                  timestamp: Date.now()
+                })
+              }
+            }, 2000);
           }
         }, 1000)
         
@@ -169,6 +181,13 @@ export default function LobbyPage() {
   // Handle incoming messages
   const handlePlayerJoin = (message: LobbyMessage) => {
     console.log('👥 Player joined:', message.data.player);
+    
+    // Validate player data before processing
+    if (!message.data.player || !message.data.player.id) {
+      console.error('❌ Invalid player data received:', message.data.player);
+      return;
+    }
+    
     setGameState(prev => {
       // Check if player already exists
       const existingPlayer = prev.players.find(p => p.id === message.data.player?.id);

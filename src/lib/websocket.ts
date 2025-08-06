@@ -218,7 +218,15 @@ export class MultiplayerWebSocket {
       this.socket.emit(event, data)
     } else {
       console.warn('⚠️ Socket not connected, event not sent:', event, data)
-      if (this.socket) {
+      
+      // Don't try to reconnect if we're already in a reconnection state
+      if (this.socket && !this.socket.connected) {
+        console.log('🔄 Socket exists but not connected, trying HTTP API...')
+        this.emitViaHTTP(event, data)
+      } else if (!this.socket) {
+        console.log('🔄 No socket available, trying HTTP API...')
+        this.emitViaHTTP(event, data)
+      } else {
         console.log('🔄 Attempting to reconnect and retry emit...')
         this.socket.connect()
         setTimeout(() => {
@@ -226,14 +234,11 @@ export class MultiplayerWebSocket {
             console.log(`📤 Retrying emit ${event}:`, data)
             this.socket.emit(event, data)
           } else {
-            console.error(`❌ Failed to emit ${event} after reconnect attempt`)
+            console.log(`❌ Failed to emit ${event} after reconnect attempt, using HTTP API`)
             // Try HTTP API as last resort
             this.emitViaHTTP(event, data)
           }
         }, 2000)
-      } else {
-        // Try HTTP API as last resort
-        this.emitViaHTTP(event, data)
       }
     }
   }
