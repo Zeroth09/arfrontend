@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { RealHumanDetection, RealHumanTarget } from '@/lib/realHumanDetection'
+import { MultiplayerTargetDetection, MultiplayerTarget } from '@/lib/multiplayerTargetDetection'
 
 interface DemoState {
   status: 'waiting' | 'playing' | 'finished'
@@ -41,7 +41,7 @@ export default function DemoPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const gameIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const realHumanDetectionRef = useRef<RealHumanDetection | null>(null)
+  const multiplayerTargetDetectionRef = useRef<MultiplayerTargetDetection | null>(null)
 
   // Initialize demo game
   useEffect(() => {
@@ -129,21 +129,21 @@ export default function DemoPage() {
         videoRef.current.onloadedmetadata = () => {
           console.log('🎬 Video metadata loaded')
           if (videoRef.current && canvasRef.current) {
-            console.log('🤖 Initializing real human detection...')
-            realHumanDetectionRef.current = new RealHumanDetection(videoRef.current, canvasRef.current)
-            realHumanDetectionRef.current.startDetection()
-            console.log('✅ Real human detection started')
+            console.log('🤖 Initializing multiplayer target detection...')
+            multiplayerTargetDetectionRef.current = new MultiplayerTargetDetection(videoRef.current, canvasRef.current, null)
+            multiplayerTargetDetectionRef.current.startDetection()
+            console.log('✅ Multiplayer target detection started')
           }
         }
         
         // Also initialize on canplay event
         videoRef.current.oncanplay = () => {
           console.log('▶️ Video can play')
-          if (videoRef.current && canvasRef.current && !realHumanDetectionRef.current) {
-            console.log('🤖 Initializing real human detection (canplay)...')
-            realHumanDetectionRef.current = new RealHumanDetection(videoRef.current, canvasRef.current)
-            realHumanDetectionRef.current.startDetection()
-            console.log('✅ Real human detection started (canplay)')
+          if (videoRef.current && canvasRef.current && !multiplayerTargetDetectionRef.current) {
+            console.log('🤖 Initializing multiplayer target detection (canplay)...')
+            multiplayerTargetDetectionRef.current = new MultiplayerTargetDetection(videoRef.current, canvasRef.current, null)
+            multiplayerTargetDetectionRef.current.startDetection()
+            console.log('✅ Multiplayer target detection started (canplay)')
           }
         }
         
@@ -165,8 +165,8 @@ export default function DemoPage() {
         const dummyVideo = document.createElement('video')
         dummyVideo.width = window.innerWidth
         dummyVideo.height = window.innerHeight
-        realHumanDetectionRef.current = new RealHumanDetection(dummyVideo, canvasRef.current)
-        realHumanDetectionRef.current.startDetection()
+        multiplayerTargetDetectionRef.current = new MultiplayerTargetDetection(dummyVideo, canvasRef.current, null)
+        multiplayerTargetDetectionRef.current.startDetection()
         console.log('✅ Detection started in fallback mode')
       }
     }
@@ -177,9 +177,9 @@ export default function DemoPage() {
       streamRef.current.getTracks().forEach(track => track.stop())
     }
     
-    // Stop real human detection
-    if (realHumanDetectionRef.current) {
-      realHumanDetectionRef.current.stopDetection()
+    // Stop multiplayer target detection
+    if (multiplayerTargetDetectionRef.current) {
+      multiplayerTargetDetectionRef.current.stopDetection()
     }
   }
 
@@ -197,10 +197,10 @@ export default function DemoPage() {
     // Add shooting sound effect
     playShootSound()
     
-    // Check if hit real human
-    const hitRealHuman = checkRealHumanHit()
-    if (hitRealHuman) {
-      handleRealHumanHit(hitRealHuman)
+    // Check if hit multiplayer target
+    const hitTarget = checkMultiplayerTargetHit()
+    if (hitTarget) {
+      handleMultiplayerTargetHit(hitTarget)
     }
     
     // Reset shooting state
@@ -227,40 +227,40 @@ export default function DemoPage() {
     oscillator.stop(audioContext.currentTime + 0.1)
   }
 
-  // Check if shot hits real human - INVISIBLE TARGETS
-  const checkRealHumanHit = () => {
-    if (!realHumanDetectionRef.current) return null
+  // Check if shot hits multiplayer target - INVISIBLE TARGETS
+  const checkMultiplayerTargetHit = () => {
+    if (!multiplayerTargetDetectionRef.current) return null
     
-    const detectedRealHumans = realHumanDetectionRef.current.getDetectedRealHumans()
+    const detectedTargets = multiplayerTargetDetectionRef.current.getDetectedTargets()
     
-    // If any humans are detected, consider it a hit (simplified for clean interface)
-    if (detectedRealHumans.length > 0) {
-      // Return the first detected human as hit
-      return detectedRealHumans[0]
+    // If any targets are detected, consider it a hit (simplified for clean interface)
+    if (detectedTargets.length > 0) {
+      // Return the first detected target as hit
+      return detectedTargets[0]
     }
     
     return null
   }
 
-  // Handle real human hit
-  const handleRealHumanHit = (human: RealHumanTarget) => {
+  // Handle multiplayer target hit
+  const handleMultiplayerTargetHit = (target: MultiplayerTarget) => {
     // Vibrate device - short vibration for hit
     if ('vibrate' in navigator) {
       navigator.vibrate(100) // Short vibration for hit
     }
     
-    // Remove human from detection
-    if (realHumanDetectionRef.current) {
-      realHumanDetectionRef.current.removeRealHuman(human.id)
+    // Remove target from detection
+    if (multiplayerTargetDetectionRef.current) {
+      multiplayerTargetDetectionRef.current.removeTarget(target.id)
     }
     
-    // Handle human elimination
-    handleRealHumanEliminated(human)
+    // Handle target elimination
+    handleMultiplayerTargetEliminated(target)
   }
 
-  // Handle real human elimination
+  // Handle multiplayer target elimination
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleRealHumanEliminated = (_human: RealHumanTarget) => {
+  const handleMultiplayerTargetEliminated = (_target: MultiplayerTarget) => {
     setDemoState(prev => ({
       ...prev,
       currentPlayer: {
@@ -455,13 +455,13 @@ export default function DemoPage() {
                  {/* Detection Status */}
          <div className="absolute top-20 left-4 bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white">
            <div className="text-lg font-bold">
-             {realHumanDetectionRef.current && realHumanDetectionRef.current.getDetectedRealHumans().length > 0 ? '🎯' : '📷'}
+             {multiplayerTargetDetectionRef.current && multiplayerTargetDetectionRef.current.getDetectedTargets().length > 0 ? '🎯' : '📷'}
            </div>
            <div className="text-sm">
-             {realHumanDetectionRef.current && realHumanDetectionRef.current.getDetectedRealHumans().length > 0 ? 'Target Acquired' : 'No Target'}
+             {multiplayerTargetDetectionRef.current && multiplayerTargetDetectionRef.current.getDetectedTargets().length > 0 ? 'Target Acquired' : 'No Target'}
            </div>
            <div className="text-xs text-gray-300 mt-1">
-             Invisible Detection
+             GPS + Human Detection
            </div>
          </div>
 
