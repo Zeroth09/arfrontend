@@ -58,12 +58,44 @@ export default function DemoPage() {
       })
     }, 1000)
 
+    // Simulate player getting hit randomly (for demo purposes)
+    const hitInterval = setInterval(() => {
+      setDemoState(prev => {
+        if (prev.status !== 'playing' || prev.currentPlayer.health <= 0) {
+          return prev
+        }
+        
+        // 5% chance to get hit every 10 seconds
+        if (Math.random() < 0.05) {
+          const newHealth = prev.currentPlayer.health - 1
+          
+          // Vibration for getting hit
+          if ('vibrate' in navigator) {
+            navigator.vibrate(150) // Medium vibration for getting hit
+          }
+          
+          if (newHealth <= 0) {
+            handlePlayerDeath()
+            return { ...prev, currentPlayer: { ...prev.currentPlayer, health: 0 } }
+          }
+          return { 
+            ...prev, 
+            currentPlayer: { ...prev.currentPlayer, health: newHealth }
+          }
+        }
+        return prev
+      })
+    }, 10000) // Check every 10 seconds
+
     // Initialize camera
     initializeCamera()
 
     return () => {
       if (gameIntervalRef.current) {
         clearInterval(gameIntervalRef.current)
+      }
+      if (hitInterval) {
+        clearInterval(hitInterval)
       }
       stopCamera()
     }
@@ -113,6 +145,11 @@ export default function DemoPage() {
     if (isShooting) return // Prevent rapid firing
     
     setIsShooting(true)
+    
+    // Add shooting vibration
+    if ('vibrate' in navigator) {
+      navigator.vibrate(50) // Light vibration for shooting
+    }
     
     // Add shooting sound effect
     playShootSound()
@@ -166,9 +203,9 @@ export default function DemoPage() {
 
   // Handle target hit
   const handleTargetHit = (target: AdvancedTarget) => {
-    // Vibrate device
+    // Vibrate device - short vibration for hit
     if ('vibrate' in navigator) {
-      navigator.vibrate(200)
+      navigator.vibrate(100) // Short vibration for hit
     }
     
     // Update target health in detection system
@@ -195,6 +232,11 @@ export default function DemoPage() {
     // Remove target from detection system
     if (targetDetectionRef.current) {
       targetDetectionRef.current.removeTarget(target.id)
+    }
+    
+    // Strong vibration for elimination
+    if ('vibrate' in navigator) {
+      navigator.vibrate([200, 100, 200]) // Pattern vibration for elimination
     }
     
     // Play elimination sound
@@ -227,6 +269,28 @@ export default function DemoPage() {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  // Handle player death (when health reaches 0)
+  const handlePlayerDeath = () => {
+    setDemoState(prev => ({
+      ...prev,
+      currentPlayer: {
+        ...prev.currentPlayer,
+        deaths: prev.currentPlayer.deaths + 1,
+        health: 0
+      }
+    }))
+    
+    // Death vibration pattern
+    if ('vibrate' in navigator) {
+      navigator.vibrate([300, 200, 300, 200, 300]) // Strong death vibration
+    }
+    
+    // Game over after 3 seconds
+    setTimeout(() => {
+      setDemoState(prev => ({ ...prev, status: 'finished' }))
+    }, 3000)
   }
 
   // Handle demo end
