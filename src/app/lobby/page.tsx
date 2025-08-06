@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { MultiplayerWebSocket, GameMessage } from '@/lib/websocket'
+import { MultiplayerWebSocket } from '@/lib/websocket'
 
 interface Player {
   id: string
@@ -18,13 +18,16 @@ interface GameState {
   gameMaster: boolean
 }
 
-interface LobbyMessage extends GameMessage {
+interface LobbyMessage {
+  type: string
+  playerId?: string
   data: {
     player?: Player
     status?: 'waiting' | 'starting' | 'playing' | 'finished'
     timeLeft?: number
     players?: Player[]
   }
+  timestamp?: number
 }
 
 export default function LobbyPage() {
@@ -60,19 +63,18 @@ export default function LobbyPage() {
         const ws = new MultiplayerWebSocket(serverUrl, currentPlayer.id, (message) => {
           console.log('Received lobby message:', message)
           
-          switch (message.type) {
-            case 'player_join':
-              handlePlayerJoin(message)
-              break
-            case 'player_leave':
-              handlePlayerLeave(message)
-              break
-            case 'game_state':
-              handleGameStateUpdate(message)
-              break
-            case 'current_players': // Added handler for current_players event
-              handleCurrentPlayers(message)
-              break
+          const lobbyMessage = message as unknown as LobbyMessage
+          
+          if (lobbyMessage.type === 'player_join') {
+            handlePlayerJoin(lobbyMessage)
+          } else if (lobbyMessage.type === 'player_leave') {
+            handlePlayerLeave(lobbyMessage)
+          } else if (lobbyMessage.type === 'game_state') {
+            handleGameStateUpdate(lobbyMessage)
+          } else if (lobbyMessage.type === 'current_players') {
+            handleCurrentPlayers(lobbyMessage)
+          } else {
+            console.log('Unknown message type:', lobbyMessage.type)
           }
         })
         

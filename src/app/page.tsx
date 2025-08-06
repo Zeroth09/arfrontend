@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { testAPIConnection } from '@/lib/api'
+import { testApiConnection } from '@/lib/api'
 
 interface PlayerData {
   nama: string
@@ -23,8 +23,11 @@ export default function HomePage() {
     setApiStatus(null)
     
     try {
-      const result = await testAPIConnection()
-      setApiStatus(result)
+      const result = await testApiConnection()
+              setApiStatus({
+          success: result.success,
+          message: result.error || 'API connection successful'
+        })
     } catch (error) {
       setApiStatus({
         success: false,
