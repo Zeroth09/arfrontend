@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { TargetDetection, Target } from '@/lib/targetDetection'
+import { AdvancedTargetDetection, AdvancedTarget } from '@/lib/advancedTargetDetection'
 
 interface GameState {
   status: 'waiting' | 'playing' | 'finished'
@@ -48,7 +48,7 @@ export default function GamePage() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const gameIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const targetDetectionRef = useRef<TargetDetection | null>(null)
+  const targetDetectionRef = useRef<AdvancedTargetDetection | null>(null)
 
   // Initialize game
   useEffect(() => {
@@ -106,7 +106,7 @@ export default function GamePage() {
         // Initialize target detection after camera is ready
         videoRef.current.onloadedmetadata = () => {
           if (videoRef.current && canvasRef.current) {
-            targetDetectionRef.current = new TargetDetection(videoRef.current, canvasRef.current)
+            targetDetectionRef.current = new AdvancedTargetDetection(videoRef.current, canvasRef.current)
             targetDetectionRef.current.startDetection()
           }
         }
@@ -187,7 +187,7 @@ export default function GamePage() {
   }
 
   // Handle target hit
-  const handleTargetHit = (target: Target) => {
+  const handleTargetHit = (target: AdvancedTarget) => {
     // Vibrate device
     if ('vibrate' in navigator) {
       navigator.vibrate(200)
@@ -205,7 +205,7 @@ export default function GamePage() {
   }
 
   // Handle target elimination
-  const handleTargetEliminated = (target: Target) => {
+  const handleTargetEliminated = (target: AdvancedTarget) => {
     setGameState(prev => ({
       ...prev,
       currentPlayer: {
@@ -376,12 +376,15 @@ export default function GamePage() {
           </div>
         </div>
         
-                 {/* Targets Count */}
+                 {/* Targets Info */}
          <div className="absolute top-20 left-4 bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white">
            <div className="text-lg font-bold">
              {targetDetectionRef.current ? targetDetectionRef.current.getVisibleTargets().length : 0}
            </div>
-           <div className="text-sm">Targets Remaining</div>
+           <div className="text-sm">Targets in Range</div>
+           <div className="text-xs text-gray-300 mt-1">
+             Max Range: 500m
+           </div>
          </div>
       </div>
       
