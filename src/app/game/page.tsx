@@ -1,525 +1,398 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import Link from 'next/link'
-
-interface Player {
-  id: string
-  nama: string
-  health: number
-  ammo: number
-  position: { x: number; y: number }
-  team: 'merah' | 'putih'
-  isAlive: boolean
-  kills: number
-  deaths: number
-}
+import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { TargetDetection, Target } from '@/lib/targetDetection'
 
 interface GameState {
-  status: 'playing' | 'finished'
+  status: 'waiting' | 'playing' | 'finished'
   timeLeft: number
-  score: { merah: number; putih: number }
-  players: Player[]
-  winner: 'merah' | 'putih' | null
+  currentPlayer: {
+    id: string
+    nama: string
+    tim: 'merah' | 'putih'
+    health: number
+    kills: number
+    deaths: number
+  }
+  targets: Array<{
+    id: string
+    type: 'human' | 'device'
+    position: { x: number; y: number }
+    health: number
+    isVisible: boolean
+  }>
 }
 
 export default function GamePage() {
+  const router = useRouter()
   const [gameState, setGameState] = useState<GameState>({
-    status: 'playing',
+    status: 'waiting',
     timeLeft: 300, // 5 menit
-    score: { merah: 5, putih: 5 }, // Alive players
-    players: [
-      // Tim Merah
-      {
-        id: '1',
-        nama: 'Player1',
-        health: 100,
-        ammo: 30,
-        position: { x: 50, y: 50 },
-        team: 'merah',
-        isAlive: true,
-        kills: 0,
-        deaths: 0
-      },
-      {
-        id: '2',
-        nama: 'Player2',
-        health: 100,
-        ammo: 30,
-        position: { x: 100, y: 50 },
-        team: 'merah',
-        isAlive: true,
-        kills: 0,
-        deaths: 0
-      },
-      {
-        id: '3',
-        nama: 'Player3',
-        health: 100,
-        ammo: 30,
-        position: { x: 150, y: 50 },
-        team: 'merah',
-        isAlive: true,
-        kills: 0,
-        deaths: 0
-      },
-      {
-        id: '4',
-        nama: 'Player4',
-        health: 100,
-        ammo: 30,
-        position: { x: 200, y: 50 },
-        team: 'merah',
-        isAlive: true,
-        kills: 0,
-        deaths: 0
-      },
-      {
-        id: '5',
-        nama: 'Player5',
-        health: 100,
-        ammo: 30,
-        position: { x: 250, y: 50 },
-        team: 'merah',
-        isAlive: true,
-        kills: 0,
-        deaths: 0
-      },
-      // Tim Putih
-      {
-        id: '6',
-        nama: 'Player6',
-        health: 100,
-        ammo: 30,
-        position: { x: 50, y: 200 },
-        team: 'putih',
-        isAlive: true,
-        kills: 0,
-        deaths: 0
-      },
-      {
-        id: '7',
-        nama: 'Player7',
-        health: 100,
-        ammo: 30,
-        position: { x: 100, y: 200 },
-        team: 'putih',
-        isAlive: true,
-        kills: 0,
-        deaths: 0
-      },
-      {
-        id: '8',
-        nama: 'Player8',
-        health: 100,
-        ammo: 30,
-        position: { x: 150, y: 200 },
-        team: 'putih',
-        isAlive: true,
-        kills: 0,
-        deaths: 0
-      },
-      {
-        id: '9',
-        nama: 'Player9',
-        health: 100,
-        ammo: 30,
-        position: { x: 200, y: 200 },
-        team: 'putih',
-        isAlive: true,
-        kills: 0,
-        deaths: 0
-      },
-      {
-        id: '10',
-        nama: 'Player10',
-        health: 100,
-        ammo: 30,
-        position: { x: 250, y: 200 },
-        team: 'putih',
-        isAlive: true,
-        kills: 0,
-        deaths: 0
-      }
-    ],
-    winner: null
+    currentPlayer: {
+      id: '',
+      nama: '',
+      tim: 'merah',
+      health: 3, // 3 nyawa
+      kills: 0,
+      deaths: 0
+    },
+    targets: []
   })
 
-  const [showMap, setShowMap] = useState(false)
-  const [showInventory, setShowInventory] = useState(false)
-  const [showGameOver, setShowGameOver] = useState(false)
+  const [isCameraActive, setIsCameraActive] = useState(false)
+  const [isShooting, setIsShooting] = useState(false)
+  const [crosshairPosition, setCrosshairPosition] = useState({ x: 0, y: 0 })
+  
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const gameIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const targetDetectionRef = useRef<TargetDetection | null>(null)
 
+  // Initialize game
   useEffect(() => {
-    const timer = setInterval(() => {
+    const playerData = localStorage.getItem('playerData')
+    if (playerData) {
+      const player = JSON.parse(playerData)
+      setGameState(prev => ({
+        ...prev,
+        currentPlayer: {
+          id: player.id,
+          nama: player.nama,
+          tim: player.tim,
+          health: 3,
+          kills: 0,
+          deaths: 0
+        },
+        status: 'playing'
+      }))
+    }
+
+    // Start game timer
+    gameIntervalRef.current = setInterval(() => {
       setGameState(prev => {
-        const newTimeLeft = Math.max(0, prev.timeLeft - 1)
-        
-        // Check if time is up
-        if (newTimeLeft === 0) {
-          const merahAlive = prev.players.filter(p => p.team === 'merah' && p.isAlive).length
-          const putihAlive = prev.players.filter(p => p.team === 'putih' && p.isAlive).length
-          
-          let winner: 'merah' | 'putih' | null = null
-          if (merahAlive > putihAlive) winner = 'merah'
-          else if (putihAlive > merahAlive) winner = 'putih'
-          else winner = 'merah' // Tie goes to red team
-          
-          return {
-            ...prev,
-            timeLeft: 0,
-            status: 'finished',
-            winner,
-            score: { merah: merahAlive, putih: putihAlive }
-          }
+        if (prev.timeLeft <= 1) {
+          return { ...prev, status: 'finished', timeLeft: 0 }
         }
-        
-        return {
-          ...prev,
-          timeLeft: newTimeLeft
-        }
+        return { ...prev, timeLeft: prev.timeLeft - 1 }
       })
     }, 1000)
 
-    return () => clearInterval(timer)
-  }, [])
+    // Initialize camera
+    initializeCamera()
 
-  // Simulate player eliminations
-  useEffect(() => {
-    const eliminationTimer = setInterval(() => {
-      setGameState(prev => {
-        if (prev.status === 'finished') return prev
-        
-        const alivePlayers = prev.players.filter(p => p.isAlive)
-        if (alivePlayers.length <= 1) {
-          const winner = alivePlayers[0]?.team || 'merah'
-          return {
-            ...prev,
-            status: 'finished',
-            winner,
-            score: { 
-              merah: prev.players.filter(p => p.team === 'merah' && p.isAlive).length,
-              putih: prev.players.filter(p => p.team === 'putih' && p.isAlive).length
-            }
-          }
-        }
-        
-        // Randomly eliminate a player every 30 seconds
-        if (Math.random() < 0.1 && alivePlayers.length > 1) {
-          const randomPlayer = alivePlayers[Math.floor(Math.random() * alivePlayers.length)]
-          const updatedPlayers = prev.players.map(p => 
-            p.id === randomPlayer.id ? { ...p, isAlive: false, health: 0 } : p
-          )
-          
-          return {
-            ...prev,
-            players: updatedPlayers,
-            score: {
-              merah: updatedPlayers.filter(p => p.team === 'merah' && p.isAlive).length,
-              putih: updatedPlayers.filter(p => p.team === 'putih' && p.isAlive).length
-            }
-          }
-        }
-        
-        return prev
-      })
-    }, 3000)
-
-    return () => clearInterval(eliminationTimer)
-  }, [])
-
-  useEffect(() => {
-    if (gameState.status === 'finished') {
-      setShowGameOver(true)
+    return () => {
+      if (gameIntervalRef.current) {
+        clearInterval(gameIntervalRef.current)
+      }
+      stopCamera()
     }
-  }, [gameState.status])
+  }, [])
 
+  // Initialize camera and AR
+  const initializeCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+        audio: false
+      })
+      
+      streamRef.current = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        setIsCameraActive(true)
+        
+        // Initialize target detection after camera is ready
+        videoRef.current.onloadedmetadata = () => {
+          if (videoRef.current && canvasRef.current) {
+            targetDetectionRef.current = new TargetDetection(videoRef.current, canvasRef.current)
+            targetDetectionRef.current.startDetection()
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Camera access denied:', error)
+      // Fallback to demo mode
+      setIsCameraActive(true)
+    }
+  }
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop())
+    }
+    
+    // Stop target detection
+    if (targetDetectionRef.current) {
+      targetDetectionRef.current.stopDetection()
+    }
+  }
+
+  // Handle shooting
+  const handleShoot = () => {
+    if (isShooting) return // Prevent rapid firing
+    
+    setIsShooting(true)
+    
+    // Add shooting sound effect
+    playShootSound()
+    
+    // Check if hit target
+    const hitTarget = checkTargetHit()
+    if (hitTarget) {
+      handleTargetHit(hitTarget)
+    }
+    
+    // Reset shooting state
+    setTimeout(() => setIsShooting(false), 200)
+  }
+
+  // Play shoot sound
+  const playShootSound = () => {
+    // Create audio context for sound effects
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const oscillator = audioContext.createOscillator()
+    const gainNode = audioContext.createGain()
+    
+    oscillator.connect(gainNode)
+    gainNode.connect(audioContext.destination)
+    
+    oscillator.frequency.setValueAtTime(800, audioContext.currentTime)
+    oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1)
+    
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1)
+    
+    oscillator.start(audioContext.currentTime)
+    oscillator.stop(audioContext.currentTime + 0.1)
+  }
+
+  // Check if shot hits target
+  const checkTargetHit = () => {
+    if (!targetDetectionRef.current) return null
+    
+    const screenCenter = { x: window.innerWidth / 2, y: window.innerHeight / 2 }
+    const hitRadius = 50 // Hit radius in pixels
+    
+    const visibleTargets = targetDetectionRef.current.getVisibleTargets()
+    return visibleTargets.find(target => {
+      const distance = Math.sqrt(
+        Math.pow(target.position.x - screenCenter.x, 2) + 
+        Math.pow(target.position.y - screenCenter.y, 2)
+      )
+      return distance < hitRadius
+    })
+  }
+
+  // Handle target hit
+  const handleTargetHit = (target: Target) => {
+    // Vibrate device
+    if ('vibrate' in navigator) {
+      navigator.vibrate(200)
+    }
+    
+    // Update target health in detection system
+    if (targetDetectionRef.current) {
+      targetDetectionRef.current.updateTargetHealth(target.id, target.health - 1)
+    }
+    
+    // Check if target is eliminated
+    if (target.health <= 1) {
+      handleTargetEliminated(target)
+    }
+  }
+
+  // Handle target elimination
+  const handleTargetEliminated = (target: Target) => {
+    setGameState(prev => ({
+      ...prev,
+      currentPlayer: {
+        ...prev.currentPlayer,
+        kills: prev.currentPlayer.kills + 1
+      }
+    }))
+    
+    // Remove target from detection system
+    if (targetDetectionRef.current) {
+      targetDetectionRef.current.removeTarget(target.id)
+    }
+    
+    // Play elimination sound
+    playEliminationSound()
+  }
+
+  // Play elimination sound
+  const playEliminationSound = () => {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const oscillator = audioContext.createOscillator()
+    const gainNode = audioContext.createGain()
+    
+    oscillator.connect(gainNode)
+    gainNode.connect(audioContext.destination)
+    
+    oscillator.frequency.setValueAtTime(200, audioContext.currentTime)
+    oscillator.frequency.setValueAtTime(400, audioContext.currentTime + 0.2)
+    oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.4)
+    
+    gainNode.gain.setValueAtTime(0.5, audioContext.currentTime)
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4)
+    
+    oscillator.start(audioContext.currentTime)
+    oscillator.stop(audioContext.currentTime + 0.4)
+  }
+
+  // Handle player death
+  const handlePlayerDeath = () => {
+    setGameState(prev => ({
+      ...prev,
+      currentPlayer: {
+        ...prev.currentPlayer,
+        deaths: prev.currentPlayer.deaths + 1,
+        health: 0
+      }
+    }))
+    
+    // Vibrate for death
+    if ('vibrate' in navigator) {
+      navigator.vibrate([100, 50, 100, 50, 100])
+    }
+    
+    // Game over after 3 seconds
+    setTimeout(() => {
+      setGameState(prev => ({ ...prev, status: 'finished' }))
+    }, 3000)
+  }
+
+  // Format time
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  const getHealthColor = (health: number) => {
-    if (health > 70) return 'text-green-400'
-    if (health > 30) return 'text-yellow-400'
-    return 'text-red-400'
+  // Handle game end
+  const handleGameEnd = () => {
+    stopCamera()
+    router.push('/lobby')
   }
 
-  const merahAlive = gameState.players.filter(p => p.team === 'merah' && p.isAlive).length
-  const putihAlive = gameState.players.filter(p => p.team === 'putih' && p.isAlive).length
+  if (gameState.status === 'finished') {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="text-center text-white">
+          <h1 className="text-4xl font-bold mb-4">Game Over</h1>
+          <div className="text-2xl mb-8">
+            <p>Kills: {gameState.currentPlayer.kills}</p>
+            <p>Deaths: {gameState.currentPlayer.deaths}</p>
+          </div>
+          <button 
+            onClick={handleGameEnd}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg text-lg"
+          >
+            Kembali ke Lobby
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-screen bg-black relative overflow-hidden">
-      {/* AR Camera View */}
-      <div className="absolute inset-0 bg-gradient-to-b from-gray-900 to-black">
-        {/* Grid overlay untuk AR */}
-        <div className="absolute inset-0 opacity-20">
-          {[...Array(20)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute border border-blue-500/30"
-              style={{
-                left: `${i * 5}%`,
-                top: 0,
-                width: '1px',
-                height: '100%'
-              }}
-            />
-          ))}
-          {[...Array(20)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute border border-blue-500/30"
-              style={{
-                top: `${i * 5}%`,
-                left: 0,
-                height: '1px',
-                width: '100%'
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Players */}
-        {gameState.players.filter(p => p.isAlive).map((player) => (
-          <div
-            key={player.id}
-            className="absolute w-16 h-16 flex items-center justify-center"
-            style={{
-              left: `${player.position.x}px`,
-              top: `${player.position.y}px`,
-              transform: 'translate(-50%, -50%)'
-            }}
-          >
-            <div className={`w-12 h-12 rounded-full border-2 ${
-              player.team === 'merah' ? 'border-red-500 bg-red-500/20' : 'border-white bg-white/20'
-            } ${player.isAlive ? 'animate-pulse' : 'opacity-50'}`}>
-              <div className="w-full h-full rounded-full flex items-center justify-center text-white font-bold">
-                {player.team === 'merah' ? '🔴' : '⚪'}
-              </div>
-            </div>
-            
-            {/* Player info */}
-            <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-black/80 rounded px-2 py-1 text-xs text-white whitespace-nowrap">
-              <div className="text-center">{player.nama}</div>
-              <div className={`text-center ${getHealthColor(player.health)}`}>
-                HP: {player.health}%
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* HUD Overlay */}
-      <div className="absolute inset-0 pointer-events-none">
-        {/* Top HUD */}
+    <div className="relative w-full h-screen bg-black overflow-hidden">
+      {/* Camera Feed */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+      
+      {/* AR Overlay */}
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 w-full h-full pointer-events-none"
+      />
+      
+      {/* Game UI */}
+      <div className="absolute inset-0 z-10">
+        {/* Top Bar - Time and Health */}
         <div className="absolute top-4 left-4 right-4 flex justify-between items-center">
-          <div className="card flex items-center space-x-4">
-            <div className="text-white">
-              <div className="text-sm text-gray-400">Waktu</div>
-              <div className={`text-xl font-bold ${gameState.timeLeft <= 30 ? 'text-red-400 animate-pulse' : 'text-white'}`}>
-                {formatTime(gameState.timeLeft)}
-              </div>
-            </div>
-            <div className="text-white">
-              <div className="text-sm text-gray-400">Score</div>
-              <div className="text-xl font-bold">
-                <span className="text-red-400">{merahAlive}</span>
-                <span className="text-gray-400"> - </span>
-                <span className="text-white">{putihAlive}</span>
-              </div>
-            </div>
+          <div className="bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white">
+            <div className="text-2xl font-bold">{formatTime(gameState.timeLeft)}</div>
+            <div className="text-sm">Time Remaining</div>
           </div>
-
-          <div className="card">
-            <button 
-              onClick={() => setShowMap(!showMap)}
-              className="text-white hover:text-blue-400 transition-colors"
-            >
-              🗺️ Peta
-            </button>
+          
+          <div className="bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white">
+            <div className="text-2xl font-bold text-red-400">
+              {'❤️'.repeat(gameState.currentPlayer.health)}
+            </div>
+            <div className="text-sm">Health</div>
+          </div>
+          
+          <div className="bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white">
+            <div className="text-2xl font-bold text-green-400">
+              {gameState.currentPlayer.kills} Kills
+            </div>
+            <div className="text-sm">Score</div>
           </div>
         </div>
-
-        {/* Bottom HUD */}
-        <div className="absolute bottom-4 left-4 right-4">
-          <div className="card flex justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <div className="text-white">
-                <div className="text-sm text-gray-400">Health</div>
-                <div className="text-xl font-bold text-green-400">100%</div>
-              </div>
-              <div className="text-white">
-                <div className="text-sm text-gray-400">Ammo</div>
-                <div className="text-xl font-bold text-yellow-400">30</div>
-              </div>
-            </div>
-
-            <div className="flex space-x-2">
-              <button 
-                onClick={() => setShowInventory(!showInventory)}
-                className="btn-secondary text-sm px-4 py-2"
-              >
-                📦 Inventory
-              </button>
-              <button className="btn-primary text-sm px-4 py-2">
-                🔫 Shoot
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Left HUD - Controls */}
-        <div className="absolute left-4 top-1/2 transform -translate-y-1/2">
-          <div className="card space-y-2">
-            <button className="w-12 h-12 bg-blue-600 rounded-full text-white hover:bg-blue-700 transition-colors">
-              ⬆️
-            </button>
-            <div className="flex space-x-2">
-              <button className="w-12 h-12 bg-blue-600 rounded-full text-white hover:bg-blue-700 transition-colors">
-                ⬅️
-              </button>
-              <button className="w-12 h-12 bg-blue-600 rounded-full text-white hover:bg-blue-700 transition-colors">
-                ➡️
-              </button>
-            </div>
-            <button className="w-12 h-12 bg-blue-600 rounded-full text-white hover:bg-blue-700 transition-colors">
-              ⬇️
-            </button>
-          </div>
-        </div>
-
-        {/* Right HUD - Actions */}
-        <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
-          <div className="card space-y-2">
-            <button className="w-12 h-12 bg-red-600 rounded-full text-white hover:bg-red-700 transition-colors">
-              🛡️
-            </button>
-            <button className="w-12 h-12 bg-green-600 rounded-full text-white hover:bg-green-700 transition-colors">
-              🏃
-            </button>
-            <button className="w-12 h-12 bg-yellow-600 rounded-full text-white hover:bg-yellow-700 transition-colors">
-              🎯
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Game Over Modal */}
-      {showGameOver && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="card max-w-md w-full mx-4 text-center">
-            <h2 className="text-3xl font-bold text-white mb-4">
-              {gameState.winner === 'merah' ? '🔴 Tim Merah Menang!' : '⚪ Tim Putih Menang!'}
-            </h2>
-            
-            <div className="mb-6">
-              <div className="text-6xl mb-4">
-                {gameState.winner === 'merah' ? '🏆' : '🏆'}
-              </div>
-              <p className="text-gray-300 mb-4">
-                Final Score: {merahAlive} - {putihAlive}
-              </p>
-              <p className="text-gray-400 text-sm">
-                Waktu: {formatTime(300 - gameState.timeLeft)}
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <button 
-                onClick={() => window.location.href = '/lobby'}
-                className="btn-primary w-full"
-              >
-                🎮 Main Lagi
-              </button>
-              <button 
-                onClick={() => window.location.href = '/'}
-                className="btn-secondary w-full"
-              >
-                🏠 Kembali ke Home
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Map Modal */}
-      {showMap && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="card max-w-2xl w-full mx-4">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold text-white">Peta Battle</h2>
-              <button 
-                onClick={() => setShowMap(false)}
-                className="text-gray-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="bg-gray-800 rounded-lg p-4 h-96 relative">
-              {/* Mini map content */}
-              <div className="w-full h-full bg-gradient-to-br from-green-900 to-blue-900 rounded-lg relative">
-                {gameState.players.filter(p => p.isAlive).map((player) => (
-                  <div
-                    key={player.id}
-                    className={`absolute w-4 h-4 rounded-full ${
-                      player.team === 'merah' ? 'bg-red-500' : 'bg-white'
-                    }`}
-                    style={{
-                      left: `${(player.position.x / 400) * 100}%`,
-                      top: `${(player.position.y / 300) * 100}%`
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Inventory Modal */}
-      {showInventory && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="card max-w-2xl w-full mx-4">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold text-white">Inventory</h2>
-              <button 
-                onClick={() => setShowInventory(false)}
-                className="text-gray-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="grid grid-cols-4 gap-4">
-              {[
-                { name: 'Rifle', icon: '🔫', ammo: 30 },
-                { name: 'Pistol', icon: '🔫', ammo: 15 },
-                { name: 'Grenade', icon: '💣', ammo: 3 },
-                { name: 'Medkit', icon: '🏥', ammo: 2 },
-                { name: 'Shield', icon: '🛡️', ammo: 1 },
-                { name: 'Smoke', icon: '💨', ammo: 5 },
-                { name: 'Flash', icon: '⚡', ammo: 3 },
-                { name: 'Scope', icon: '🔍', ammo: 1 }
-              ].map((item, index) => (
-                <div key={index} className="card text-center p-4">
-                  <div className="text-3xl mb-2">{item.icon}</div>
-                  <div className="text-white text-sm font-bold">{item.name}</div>
-                  <div className="text-gray-400 text-xs">{item.ammo}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Exit Button */}
-      <div className="absolute top-4 right-4">
-        <Link href="/lobby">
-          <button className="btn-secondary text-sm px-4 py-2">
-            Keluar Game
+        
+        {/* Crosshair */}
+        <div 
+          className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 pointer-events-none"
+          style={{
+            background: 'radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0.3) 50%, transparent 100%)',
+            borderRadius: '50%'
+          }}
+        />
+        
+        {/* Shoot Button */}
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
+          <button
+            onClick={handleShoot}
+            disabled={isShooting}
+            className={`
+              w-24 h-24 rounded-full border-4 border-white/50 
+              ${isShooting 
+                ? 'bg-red-600 scale-95' 
+                : 'bg-red-500 hover:bg-red-600 hover:scale-105'
+              }
+              transition-all duration-100 ease-out
+              shadow-2xl
+            `}
+          >
+            <div className="text-white text-2xl font-bold">🎯</div>
           </button>
-        </Link>
+        </div>
+        
+        {/* Player Info */}
+        <div className="absolute bottom-8 right-4 bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white">
+          <div className="text-lg font-bold">{gameState.currentPlayer.nama}</div>
+          <div className="text-sm">
+            Team: {gameState.currentPlayer.tim === 'merah' ? '🔴 Merah' : '⚪ Putih'}
+          </div>
+        </div>
+        
+                 {/* Targets Count */}
+         <div className="absolute top-20 left-4 bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white">
+           <div className="text-lg font-bold">
+             {targetDetectionRef.current ? targetDetectionRef.current.getVisibleTargets().length : 0}
+           </div>
+           <div className="text-sm">Targets Remaining</div>
+         </div>
       </div>
+      
+      {/* Loading Screen */}
+      {!isCameraActive && (
+        <div className="absolute inset-0 bg-black flex items-center justify-center z-20">
+          <div className="text-center text-white">
+            <div className="text-4xl mb-4">📷</div>
+            <div className="text-xl">Initializing Camera...</div>
+            <div className="text-sm mt-2">Please allow camera access</div>
+          </div>
+        </div>
+      )}
     </div>
   )
 } 
