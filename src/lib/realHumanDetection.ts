@@ -18,7 +18,7 @@ export interface RealHumanTarget {
     height: number
   }
   lastSeen: number
-  detectionMethod: 'face' | 'body' | 'motion'
+  detectionMethod: 'face' | 'body' | 'motion' | 'camera'
 }
 
 export class RealHumanDetection {
@@ -133,15 +133,15 @@ export class RealHumanDetection {
         await this.detectBodies()
       }
 
-      // Only use real detection models
+      // Fallback to basic camera detection
       if (!this.faceDetectionModel && !this.bodyDetectionModel) {
-        console.log('📷 No detection models available - using camera only')
-        // Don't generate any simulated targets
+        console.log('📷 Using basic camera detection')
+        this.performBasicCameraDetection()
       }
 
     } catch (error) {
       console.error('Detection error:', error)
-      this.simulateRealDetection()
+      this.performBasicCameraDetection()
     }
   }
 
@@ -240,6 +240,100 @@ export class RealHumanDetection {
     }
   }
 
+  // Perform basic camera detection without external models
+  private performBasicCameraDetection() {
+    if (!this.videoElement || !this.canvasElement) return
+    
+    const videoWidth = this.videoElement.videoWidth || window.innerWidth
+    const videoHeight = this.videoElement.videoHeight || window.innerHeight
+    
+    // Create canvas context for image analysis
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    
+    canvas.width = videoWidth
+    canvas.height = videoHeight
+    
+    // Draw video frame to canvas
+    ctx.drawImage(this.videoElement, 0, 0, videoWidth, videoHeight)
+    
+    // Get image data for analysis
+    const imageData = ctx.getImageData(0, 0, videoWidth, videoHeight)
+    const data = imageData.data
+    
+    // Basic skin tone detection (simplified)
+    const skinTonePixels = this.detectSkinTones(data, videoWidth, videoHeight)
+    
+    // Generate human targets based on skin tone detection
+    if (skinTonePixels.length > 0) {
+      this.generateHumanFromSkinTones(skinTonePixels, videoWidth, videoHeight)
+    }
+  }
+  
+  // Detect skin tones in image data
+  private detectSkinTones(data: Uint8ClampedArray, width: number, height: number) {
+    const skinPixels: { x: number; y: number }[] = []
+    
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i]
+      const g = data[i + 1]
+      const b = data[i + 2]
+      
+      // Basic skin tone detection (RGB ranges)
+      if (r > 95 && g > 40 && b > 20 && 
+          Math.max(r, g, b) - Math.min(r, g, b) > 15 &&
+          Math.abs(r - g) > 15 && r > g && r > b) {
+        
+        const pixelIndex = i / 4
+        const x = pixelIndex % width
+        const y = Math.floor(pixelIndex / width)
+        
+        skinPixels.push({ x, y })
+      }
+    }
+    
+    return skinPixels
+  }
+  
+  // Generate human target from skin tone detection
+  private generateHumanFromSkinTones(skinPixels: { x: number; y: number }[], width: number, height: number) {
+    if (skinPixels.length < 100) return // Need enough pixels
+    
+    // Find center of skin tone area
+    const centerX = skinPixels.reduce((sum, p) => sum + p.x, 0) / skinPixels.length
+    const centerY = skinPixels.reduce((sum, p) => sum + p.y, 0) / skinPixels.length
+    
+    // Calculate bounding box
+    const minX = Math.min(...skinPixels.map(p => p.x))
+    const maxX = Math.max(...skinPixels.map(p => p.x))
+    const minY = Math.min(...skinPixels.map(p => p.y))
+    const maxY = Math.max(...skinPixels.map(p => p.y))
+    
+    const boxWidth = maxX - minX
+    const boxHeight = maxY - minY
+    
+    // Only create target if area is reasonable (not too small or too large)
+    if (boxWidth > 50 && boxHeight > 100 && boxWidth < width * 0.8 && boxHeight < height * 0.8) {
+      this.addRealHuman({
+        id: `camera_${Date.now()}`,
+        position: { x: centerX, y: centerY, z: 200 },
+        distance: 200,
+        confidence: 0.7,
+        isMoving: false,
+        faceDetected: true,
+        boundingBox: {
+          x: minX,
+          y: minY,
+          width: boxWidth,
+          height: boxHeight
+        },
+        lastSeen: Date.now(),
+        detectionMethod: 'camera'
+      })
+    }
+  }
+  
   // Simulate real detection when models are not available
   private simulateRealDetection() {
     // DISABLED: No more simulated red targets
@@ -416,6 +510,9 @@ export class RealHumanDetection {
     } else if (human.detectionMethod === 'body') {
       fillColor = '#4444ff' // Blue for body detection
       strokeColor = '#4444ff'
+    } else if (human.detectionMethod === 'camera') {
+      fillColor = '#ffff44' // Yellow for camera detection
+      strokeColor = '#ffff44'
     }
     
     this.ctx.fillStyle = `${fillColor}${Math.floor(human.confidence * 255).toString(16).padStart(2, '0')}`
