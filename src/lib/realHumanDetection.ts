@@ -327,7 +327,9 @@ export class RealHumanDetection {
     const validPoints = keypoints.filter((kp: any) => kp.score > 0.5)
     if (validPoints.length === 0) return { x: 0, y: 0 }
     
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const avgX = validPoints.reduce((sum, kp: any) => sum + kp.x, 0) / validPoints.length
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const avgY = validPoints.reduce((sum, kp: any) => sum + kp.y, 0) / validPoints.length
     
     return { x: avgX, y: avgY }
