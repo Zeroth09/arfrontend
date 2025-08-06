@@ -193,8 +193,7 @@ export default function LobbyPage() {
     
     // Send game start message to all players
     if (multiplayer) {
-      multiplayer.sendMessage({
-        type: 'game_state',
+      multiplayer.emit('game_state', {
         playerId: currentPlayerRef.current?.id || '',
         data: {
           status: 'starting',
@@ -214,8 +213,7 @@ export default function LobbyPage() {
   const handleLeaveLobby = () => {
     // Send leave message to server
     if (multiplayer && currentPlayerRef.current) {
-      multiplayer.sendMessage({
-        type: 'player_leave',
+      multiplayer.emit('player_leave', {
         playerId: currentPlayerRef.current.id,
         data: {
           player: currentPlayerRef.current,
@@ -263,7 +261,7 @@ export default function LobbyPage() {
               }`}>
                 <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
                 <span className="font-semibold">
-                  {isConnected ? '🟢 Multiplayer Connected' : '🔴 Multiplayer Disconnected'}
+                  {isConnected ? `🟢 Multiplayer Connected (${multiplayer?.getConnectionType() || 'Unknown'})` : '🔴 Multiplayer Disconnected'}
                 </span>
               </div>
               <div className="text-sm text-gray-400 mt-2">

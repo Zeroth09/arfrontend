@@ -3,75 +3,90 @@ import { ApiResponse, LoginRequest, RegisterRequest, AuthResponse, GameRoom, Use
 const API_BASE_URL = 'https://confident-clarity-production.up.railway.app'
 
 // Test API connection
-export const testAPIConnection = async (): Promise<{ success: boolean; message: string; response?: unknown }> => {
+export const testApiConnection = async (): Promise<ApiResponse<any>> => {
   try {
-    console.log('Testing API connection to:', API_BASE_URL)
-    
-    // Try multiple endpoints
-    const endpoints = ['/', '/health', '/api/health', '/status']
-    
-    for (const endpoint of endpoints) {
-      try {
-        console.log(`Trying endpoint: ${endpoint}`)
-        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        })
-
-        console.log(`Endpoint ${endpoint} - Response status:`, response.status)
-        
-        if (response.ok) {
-          const data = await response.json().catch(() => ({ message: 'OK' }))
-          console.log(`Endpoint ${endpoint} - Response data:`, data)
-          return {
-            success: true,
-            message: `API berhasil terkoneksi! (${endpoint})`,
-            response: data
-          }
-        }
-      } catch (endpointError) {
-        console.log(`Endpoint ${endpoint} failed:`, endpointError)
-        continue
-      }
-    }
-    
-    // If all endpoints fail, try a simple GET request
-    const response = await fetch(`${API_BASE_URL}`, {
+    const response = await fetch(`${API_BASE_URL}/`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
     })
-
-    console.log('Final API Response status:', response.status)
-    console.log('Final API Response headers:', response.headers)
-
-    if (response.ok) {
-      const data = await response.json().catch(() => ({ message: 'Server is running' }))
-      console.log('Final API Response data:', data)
-      return {
-        success: true,
-        message: 'API berhasil terkoneksi!',
-        response: data
-      }
-    } else {
-      const errorData = await response.text()
-      console.log('API Error response:', errorData)
-      return {
-        success: false,
-        message: `API Error: ${response.status} - ${errorData}`,
-        response: errorData
-      }
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
+    
+    const data = await response.json()
+    return { success: true, data }
   } catch (error) {
-    console.error('API Connection Error:', error)
-    return {
-      success: false,
-      message: `Koneksi gagal: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      response: error
+    console.error('API connection test failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+}
+
+// HTTP API methods as fallback for WebSocket
+export const joinPlayerHttp = async (playerId: string, player: any): Promise<ApiResponse<any>> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/player/join`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ playerId, player })
+    })
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
+    
+    const data = await response.json()
+    return { success: true, data }
+  } catch (error) {
+    console.error('HTTP join player failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+}
+
+export const getPlayersHttp = async (): Promise<ApiResponse<any>> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/players`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    })
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    return { success: true, data }
+  } catch (error) {
+    console.error('HTTP get players failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+}
+
+export const leavePlayerHttp = async (playerId: string): Promise<ApiResponse<any>> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/player/leave`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ playerId })
+    })
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    
+    const data = await response.json()
+    return { success: true, data }
+  } catch (error) {
+    console.error('HTTP leave player failed:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }
 
