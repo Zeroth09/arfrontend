@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { AdvancedTargetDetection, AdvancedTarget } from '@/lib/advancedTargetDetection'
+import { HumanDetection, HumanTarget } from '@/lib/humanDetection'
 
 interface DemoState {
   status: 'waiting' | 'playing' | 'finished'
@@ -41,7 +41,7 @@ export default function DemoPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const gameIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const targetDetectionRef = useRef<AdvancedTargetDetection | null>(null)
+  const humanDetectionRef = useRef<HumanDetection | null>(null)
 
   // Initialize demo game
   useEffect(() => {
@@ -114,11 +114,11 @@ export default function DemoPage() {
         videoRef.current.srcObject = stream
         setIsCameraActive(true)
         
-        // Initialize target detection after camera is ready
+        // Initialize human detection after camera is ready
         videoRef.current.onloadedmetadata = () => {
           if (videoRef.current && canvasRef.current) {
-            targetDetectionRef.current = new AdvancedTargetDetection(videoRef.current, canvasRef.current)
-            targetDetectionRef.current.startDetection()
+            humanDetectionRef.current = new HumanDetection(videoRef.current, canvasRef.current)
+            humanDetectionRef.current.startDetection()
           }
         }
       }
@@ -134,9 +134,9 @@ export default function DemoPage() {
       streamRef.current.getTracks().forEach(track => track.stop())
     }
     
-    // Stop target detection
-    if (targetDetectionRef.current) {
-      targetDetectionRef.current.stopDetection()
+    // Stop human detection
+    if (humanDetectionRef.current) {
+      humanDetectionRef.current.stopDetection()
     }
   }
 
@@ -154,10 +154,10 @@ export default function DemoPage() {
     // Add shooting sound effect
     playShootSound()
     
-    // Check if hit target
-    const hitTarget = checkTargetHit()
-    if (hitTarget) {
-      handleTargetHit(hitTarget)
+    // Check if hit human
+    const hitHuman = checkHumanHit()
+    if (hitHuman) {
+      handleHumanHit(hitHuman)
     }
     
     // Reset shooting state
@@ -184,43 +184,41 @@ export default function DemoPage() {
     oscillator.stop(audioContext.currentTime + 0.1)
   }
 
-  // Check if shot hits target
-  const checkTargetHit = () => {
-    if (!targetDetectionRef.current) return null
+  // Check if shot hits human
+  const checkHumanHit = () => {
+    if (!humanDetectionRef.current) return null
     
     const screenCenter = { x: window.innerWidth / 2, y: window.innerHeight / 2 }
     const hitRadius = 50 // Hit radius in pixels
     
-    const visibleTargets = targetDetectionRef.current.getVisibleTargets()
-    return visibleTargets.find(target => {
+    const detectedHumans = humanDetectionRef.current.getDetectedHumans()
+    return detectedHumans.find(human => {
       const distance = Math.sqrt(
-        Math.pow(target.position.x - screenCenter.x, 2) + 
-        Math.pow(target.position.y - screenCenter.y, 2)
+        Math.pow(human.position.x - screenCenter.x, 2) + 
+        Math.pow(human.position.y - screenCenter.y, 2)
       )
       return distance < hitRadius
     })
   }
 
-  // Handle target hit
-  const handleTargetHit = (target: AdvancedTarget) => {
+  // Handle human hit
+  const handleHumanHit = (human: HumanTarget) => {
     // Vibrate device - short vibration for hit
     if ('vibrate' in navigator) {
       navigator.vibrate(100) // Short vibration for hit
     }
     
-    // Update target health in detection system
-    if (targetDetectionRef.current) {
-      targetDetectionRef.current.updateTargetHealth(target.id, target.health - 1)
+    // Remove human from detection
+    if (humanDetectionRef.current) {
+      humanDetectionRef.current.removeHuman(human.id)
     }
     
-    // Check if target is eliminated
-    if (target.health <= 1) {
-      handleTargetEliminated(target)
-    }
+    // Handle human elimination
+    handleHumanEliminated(human)
   }
 
-  // Handle target elimination
-  const handleTargetEliminated = (target: AdvancedTarget) => {
+  // Handle human elimination
+  const handleHumanEliminated = (human: HumanTarget) => {
     setDemoState(prev => ({
       ...prev,
       currentPlayer: {
@@ -228,11 +226,6 @@ export default function DemoPage() {
         kills: prev.currentPlayer.kills + 1
       }
     }))
-    
-    // Remove target from detection system
-    if (targetDetectionRef.current) {
-      targetDetectionRef.current.removeTarget(target.id)
-    }
     
     // Strong vibration for elimination
     if ('vibrate' in navigator) {
@@ -415,16 +408,16 @@ export default function DemoPage() {
           </div>
         </div>
         
-        {/* Targets Info */}
-        <div className="absolute top-20 left-4 bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white">
-          <div className="text-lg font-bold">
-            {targetDetectionRef.current ? targetDetectionRef.current.getVisibleTargets().length : 0}
-          </div>
-          <div className="text-sm">Targets in Range</div>
-          <div className="text-xs text-gray-300 mt-1">
-            Max Range: 500m
-          </div>
-        </div>
+                 {/* Humans Info */}
+         <div className="absolute top-20 left-4 bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white">
+           <div className="text-lg font-bold">
+             {humanDetectionRef.current ? humanDetectionRef.current.getDetectedHumans().length : 0}
+           </div>
+           <div className="text-sm">Humans Detected</div>
+           <div className="text-xs text-gray-300 mt-1">
+             Max Range: 400m
+           </div>
+         </div>
 
         {/* Demo Info */}
         <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white">
