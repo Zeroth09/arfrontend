@@ -238,8 +238,28 @@ export class MultiplayerWebSocket {
     }
   }
 
+  private lastHttpRequest = 0;
+  private httpRequestCooldown = 2000; // 2 seconds between HTTP requests
+  private consecutiveFailures = 0;
+  private maxConsecutiveFailures = 3;
+  private circuitBreakerOpen = false;
+
   private async emitViaHTTP(event: string, data: Record<string, unknown>): Promise<void> {
     try {
+      // Check circuit breaker
+      if (this.circuitBreakerOpen) {
+        console.log('🔌 Circuit breaker open, skipping HTTP request');
+        return;
+      }
+      
+      // Throttle HTTP requests to prevent rate limiting
+      const now = Date.now();
+      if (now - this.lastHttpRequest < this.httpRequestCooldown) {
+        console.log('⏳ HTTP request throttled, skipping...');
+        return;
+      }
+      this.lastHttpRequest = now;
+      
       console.log(`📤 Emitting ${event} via HTTP API:`, data)
       
       // Add timeout and retry logic
@@ -261,8 +281,40 @@ export class MultiplayerWebSocket {
         if (response.ok) {
           const result = await response.json()
           console.log('✅ HTTP API response:', result)
+          // Reset failure counter on success
+          this.consecutiveFailures = 0;
+        } else if (response.status === 429) {
+          console.error('❌ Rate limited - too many requests')
+          this.consecutiveFailures++;
+          // Increase cooldown on rate limit
+          this.httpRequestCooldown = 10000; // 10 seconds
+          
+          // Open circuit breaker if too many failures
+          if (this.consecutiveFailures >= this.maxConsecutiveFailures) {
+            this.circuitBreakerOpen = true;
+            console.log('🔌 Circuit breaker opened due to repeated failures');
+            // Reset after 30 seconds
+            setTimeout(() => {
+              this.circuitBreakerOpen = false;
+              this.consecutiveFailures = 0;
+              console.log('🔌 Circuit breaker reset');
+            }, 30000);
+          }
         } else {
           console.error('❌ HTTP API error:', response.status, response.statusText)
+          this.consecutiveFailures++;
+          
+          // Open circuit breaker if too many failures
+          if (this.consecutiveFailures >= this.maxConsecutiveFailures) {
+            this.circuitBreakerOpen = true;
+            console.log('🔌 Circuit breaker opened due to repeated failures');
+            setTimeout(() => {
+              this.circuitBreakerOpen = false;
+              this.consecutiveFailures = 0;
+              console.log('🔌 Circuit breaker reset');
+            }, 30000);
+          }
+          
           // Try to get error details
           try {
             const errorText = await response.text()
@@ -286,6 +338,9 @@ export class MultiplayerWebSocket {
         if (response.ok) {
           const result = await response.json()
           console.log('✅ HTTP API response:', result)
+        } else if (response.status === 429) {
+          console.error('❌ Rate limited - too many requests')
+          this.httpRequestCooldown = 10000; // 10 seconds
         } else {
           console.error('❌ HTTP API error:', response.status, response.statusText)
         }
