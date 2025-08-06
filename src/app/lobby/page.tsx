@@ -188,22 +188,28 @@ export default function LobbyPage() {
       return;
     }
     
+    // Ensure joinedAt is a valid Date object
+    const playerData = {
+      ...message.data.player,
+      joinedAt: message.data.player.joinedAt ? new Date(message.data.player.joinedAt) : new Date()
+    };
+    
     setGameState(prev => {
       // Check if player already exists
-      const existingPlayer = prev.players.find(p => p.id === message.data.player?.id);
+      const existingPlayer = prev.players.find(p => p.id === playerData.id);
       if (existingPlayer) {
         console.log('Player already exists, updating...');
         return {
           ...prev,
           players: prev.players.map(p => 
-            p.id === message.data.player?.id ? message.data.player as Player : p
+            p.id === playerData.id ? playerData as Player : p
           )
         };
       } else {
         console.log('Adding new player...');
         return {
           ...prev,
-          players: [...prev.players, message.data.player as Player]
+          players: [...prev.players, playerData as Player]
         };
       }
     });
@@ -419,7 +425,7 @@ export default function LobbyPage() {
                     <span className="text-white font-semibold">{player.nama}</span>
                   </div>
                   <div className="text-sm text-gray-400">
-                    Joined: {player.joinedAt ? player.joinedAt.toLocaleTimeString() : 'N/A'}
+                    Joined: {player.joinedAt && player.joinedAt instanceof Date ? player.joinedAt.toLocaleTimeString() : 'N/A'}
                   </div>
                 </div>
               ))}
@@ -446,7 +452,7 @@ export default function LobbyPage() {
                     <span className="text-white font-semibold">{player.nama}</span>
                   </div>
                   <div className="text-sm text-gray-400">
-                    Joined: {player.joinedAt ? player.joinedAt.toLocaleTimeString() : 'N/A'}
+                    Joined: {player.joinedAt && player.joinedAt instanceof Date ? player.joinedAt.toLocaleTimeString() : 'N/A'}
                   </div>
                 </div>
               ))}
